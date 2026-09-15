@@ -11,30 +11,45 @@
 
 /* ── manopole ────────────────────────────────────────────────────────────
 
-   TENUTA_VH è la manopola che conta. Le altre la rifiniscono.           */
+   SOSTA_VH e SALITA_VH sono le due che contano. Le altre rifiniscono.  */
 
-var TENUTA_VH = 1.60; /* schermate di scroll in cui la sezione RESTA FERMA
-                         sullo schermo mentre la salita si consuma.
+var SOSTA_VH  = 0.80; /* LA TENUTA — schermate di scroll in cui, arrivati in
+                         fondo alla sezione, non si muove NIENTE. La sezione è
+                         ferma, i riquadri sono tutti appoggiati al bordo
+                         basso, e tu scrolli a vuoto finché la riserva non è
+                         consumata. Per proseguire devi continuare a
+                         scrollare: è il blocco.
 
-                         È il modo giusto di allungare la sezione. Alzarne
-                         l'altezza nel Designer non lo sarebbe: l'Embed del
-                         reel calcola il suo gradino come `altezza della
-                         sezione × 0.185`, quindi una sezione più alta non
-                         dà più tempo — dà riquadri più grandi, e a 200vh
-                         sarebbero grandi il doppio dello schermo. Qui la
-                         sezione resta alta uguale e a cambiare è solo
-                         quanto scroll ci vuole per attraversarla: la
-                         geometria del nastro non se ne accorge.
+                         È la stessa cosa che fa trattieni() nell'intro, con
+                         lo stesso numero: là `SOSTA = 0.80` e la riserva si
+                         aggiunge all'altezza della traccia, qui a quella
+                         della scatola. Il meccanismo è quello, non una
+                         copia alla lontana.
 
-                         Come lo fa: la sezione viene infilata in una
-                         scatola alta `altezza + TENUTA` e resa `sticky`.
-                         È lo stesso schema di .cape-hs-wrap, che sta due
-                         sezioni più su e fa esattamente questo.
+                         Scatta all'INIZIO della parallassi — riquadri tutti
+                         sul bordo basso — e non alla fine.                */
 
-                         1.60 = una schermata e mezza abbondante. Alza per
-                         andare più piano, abbassa per più svelto.
-                         0 spegne la tenuta: niente scatola, niente sticky,
-                         la sezione torna a scorrere come prima.          */
+var SALITA_VH = 1.60; /* schermate di scroll in cui la salita si consuma,
+                         DOPO che la tenuta è finita. La sezione resta ferma
+                         anche qui: a muoversi sono solo i riquadri.
+
+                         Insieme, SOSTA + SALITA sono la riserva che viene
+                         aggiunta alla sezione. È il modo giusto di
+                         allungarla: alzarne l'altezza nel Designer non lo
+                         sarebbe, perché l'Embed del reel ricava il suo
+                         gradino da `altezza della sezione × 0.185` — una
+                         sezione più alta non dà più tempo, dà riquadri più
+                         grandi, e a 200vh sarebbero grandi il doppio dello
+                         schermo. Qui la sezione resta alta uguale e a
+                         cambiare è solo quanto scroll ci vuole per
+                         attraversarla: la geometria del nastro non se ne
+                         accorge.
+
+                         Come tiene fermo: la sezione entra in una scatola
+                         alta `altezza + riserva` ed è `sticky`, incollata
+                         col proprio fondo sul fondo dello schermo. Lo stesso
+                         schema di .cape-hs-wrap, due sezioni più su.
+                         Tutte e due a 0 spengono la scatola.              */
 
 var MORBIDEZZA = 0.10; /* 0..1 — quanto la salita insegue lo scroll invece
                           di esserci incollata. Questo è lo smorzamento
@@ -98,7 +113,7 @@ if(ridotto) return;   /* chi ha chiesto meno movimento tiene la scaletta
 
 var scatola = null;
 
-if(TENUTA_VH > 0 && sec.parentNode){
+if(SOSTA_VH + SALITA_VH > 0 && sec.parentNode){
   scatola = document.createElement('div');
   scatola.setAttribute('data-reel-tenuta','');
   sec.parentNode.insertBefore(scatola, sec);
@@ -111,7 +126,7 @@ if(TENUTA_VH > 0 && sec.parentNode){
 
 /* ── misure ──────────────────────────────────────────────────────────── */
 
-var ALT = 1, VIA = 0, CORSA = 1, quieto = false;
+var ALT = 1, VIA = 0, ATTESA = 0, CORSA = 1, quieto = false;
 
 function misura(){
   /* Si misura sempre da fermo. Se la sezione è uscita dallo schermo mentre
@@ -131,10 +146,16 @@ function misura(){
        viene negativo, ed è ancora giusto: sporge in alto e si incolla col
        fondo lo stesso. */
     sec.style.top = (vh - H) + 'px';
-    CORSA = Math.max(1, TENUTA_VH * vh);
-    scatola.style.height = (H + CORSA) + 'px';
+
+    /* La riserva, come in trattieni(): tanta altezza in più quanto scroll
+       vogliamo poter consumare stando fermi. Il primo pezzo è la tenuta —
+       tratto morto, non si muove niente — il secondo è la salita. */
+    ATTESA = Math.max(0, SOSTA_VH * vh);
+    CORSA  = Math.max(1, SALITA_VH * vh);
+    scatola.style.height = (H + ATTESA + CORSA) + 'px';
   } else {
-    CORSA = Math.max(1, vh * 0.30);
+    ATTESA = 0;
+    CORSA  = Math.max(1, vh * 0.30);
   }
 
   /* Il fondo su cui i riquadri sono appoggiati è quello della scatola
@@ -183,8 +204,14 @@ function misura(){
 
 function dove(){
   var vh = window.innerHeight || 1;
-  if(scatola) return (vh - sec.offsetHeight - scatola.getBoundingClientRect().top) / CORSA;
-  return (vh - sec.getBoundingClientRect().bottom) / CORSA;
+  if(!scatola) return (vh - sec.getBoundingClientRect().bottom) / CORSA;
+
+  /* Quanto scroll è passato da quando la sezione si è incollata. I primi
+     ATTESA pixel sono la tenuta: il conto resta negativo, viene tagliato a
+     zero dal chiamante, e per tutto quel tratto i riquadri non si muovono di
+     un pixel. È lì che sei bloccato. */
+  var percorso = (vh - sec.offsetHeight) - scatola.getBoundingClientRect().top;
+  return (percorso - ATTESA) / CORSA;
 }
 
 
