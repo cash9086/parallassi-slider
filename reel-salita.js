@@ -1,78 +1,76 @@
 /* parallassi-slider — reel-salita.js
-   La scaletta del reel che si alza e si rovescia mentre scorri.
-   Gira da solo: se in pagina non c'è [data-reel] esce subito e non costa niente.
+   La sezione reel si ferma, e mentre sta ferma la scaletta si alza e si
+   rovescia. Gira da sola: se in pagina non c'è [data-reel] esce subito.
    Non tocca l'Embed del reel — scrive `bottom`, lui scrive `transform`,
    `width` e `height`: proprietà diverse, si sommano invece di cancellarsi.
    Le manopole e il perché di ognuna stanno qui sotto; il quadro d'insieme
    nel README della repo.
 */
-/* ══ 2. LA SALITA ═══════════════════════════════════════════════════════
-   Una sola legge, e tutti e tre i disegni vengono da lì.
-
-   La riga a cui tutto tende è il BORDO ALTO DELLO SCHERMO, non il bordo
-   alto della sezione. Sono due cose diverse e la differenza è tutto: nel
-   punto in cui il blocco ti ferma la sezione riempie già l'inquadratura,
-   quindi il suo bordo alto esce di scena al primo pixel di scroll e una
-   salita puntata lì finirebbe fuori campo, dove non la vedresti mai.
-   Puntata allo schermo invece finisce davanti agli occhi. È anche quello
-   che dice il disegno: il bloccone tocca IN CIMA.
-
-   Chiamiamo B la distanza fra il bordo alto dello schermo e il fondo su
-   cui i riquadri sono appoggiati, h l'altezza del riquadro, u quanto sei
-   avanzato nella salita (0 = fermo sull'ancora, 1 = finita):
-
-       bottom = u · (B − h)
-
-   A u=0 tutti a zero: la scaletta di oggi, intatta.
-   A u=1 il riquadro è alzato di tutto quello che lo separava dalla cima,
-   quindi TUTTI hanno il bordo alto sulla stessa riga, che è il bordo dello
-   schermo: la scaletta rovescia.
-   A u=0.5, a metà strada, ognuno sta a (B−h)/2 dal fondo — che è come dire
-   che il suo centro sta a B/2, cioè a metà esatta. Tutti i centri sulla
-   stessa riga: il disegno di mezzo, e non l'ho messo io, esce da sé.
-
-   Ed esce da sé anche la cosa che volevi vedere. Il riquadro piccolo ha h
-   piccolo, quindi (B−h) grande: sale tanto. Il bloccone di destra è alto
-   quasi quanto B, quindi (B−h) è poco: si muove appena. Non c'è nessuna
-   velocità scritta da nessuna parte — i piccoli corrono perché hanno più
-   strada da fare, e arrivano insieme perché la percorrono nello stesso
-   tempo. Il bloccone a metà vuol dire tutti a metà, il bloccone in cima
-   vuol dire tutti in cima: è la stessa u.
-
-   Il riquadro che rinasce a sinistra grande zero non fa eccezione e non ha
-   bisogno di un caso speciale: h≈0 → sale di tutta B, cioè nasce in cima
-   invece che in fondo, e cresce verso il basso. Il giro si chiude uguale a
-   com'è sempre stato.                                                  */
 (function(){
 'use strict';
 
-/* ── manopole ────────────────────────────────────────────────────────── */
+/* ── manopole ────────────────────────────────────────────────────────────
 
-var ALLUNGA = 1.00; /* quanto dura la salita, in multipli della corsa
-                       GEOMETRICA — quella che il disegno descrive da sé:
-                       il bloccone parte col fondo sul fondo dello schermo e
-                       finisce col bordo alto in cima, quindi la corsa è
-                       "altezza dello schermo meno altezza del bloccone".
-                       Non è un numero che ho scelto io: è misurato, e si
-                       riadatta a ogni monitor.
+   TENUTA_VH è la manopola che conta. Le altre la rifiniscono.           */
 
-                       1.00 è anche il valore oltre il quale si comincia a
-                       pagare: alzandolo la salita dura di più e si legge
-                       meglio scrollando piano, ma i riquadri più alti
-                       arrivano in cima quando il fondo della sezione è già
-                       risalito sopra il loro bordo basso, e la sezione —
-                       che ritaglia — glielo taglia. Sotto 1.00 la salita è
-                       più secca e finisce mentre il bloccone è ancora a
-                       mezzo schermo. */
+var TENUTA_VH = 1.60; /* schermate di scroll in cui la sezione RESTA FERMA
+                         sullo schermo mentre la salita si consuma.
 
-var SPINTA  = 1.00; /* quanto il testo in alto a sinistra viene spinto via
-                       dalle immagini che salgono. 1 = a fine salita è
-                       uscito esattamente dal bordo alto della sezione.
-                       0 = sta fermo. Sopra 1 esce prima.
-                       Non sposta il testo a mano: sposta il rettangolo
-                       vuoto su cui il testo atterra, e il testo lo segue da
-                       solo perché la consegna rilegge quel rettangolo a
-                       ogni fotogramma. Una cosa spostata, non due.       */
+                         È il modo giusto di allungare la sezione. Alzarne
+                         l'altezza nel Designer non lo sarebbe: l'Embed del
+                         reel calcola il suo gradino come `altezza della
+                         sezione × 0.185`, quindi una sezione più alta non
+                         dà più tempo — dà riquadri più grandi, e a 200vh
+                         sarebbero grandi il doppio dello schermo. Qui la
+                         sezione resta alta uguale e a cambiare è solo
+                         quanto scroll ci vuole per attraversarla: la
+                         geometria del nastro non se ne accorge.
+
+                         Come lo fa: la sezione viene infilata in una
+                         scatola alta `altezza + TENUTA` e resa `sticky`.
+                         È lo stesso schema di .cape-hs-wrap, che sta due
+                         sezioni più su e fa esattamente questo.
+
+                         1.60 = una schermata e mezza abbondante. Alza per
+                         andare più piano, abbassa per più svelto.
+                         0 spegne la tenuta: niente scatola, niente sticky,
+                         la sezione torna a scorrere come prima.          */
+
+var MORBIDEZZA = 0.10; /* 0..1 — quanto la salita insegue lo scroll invece
+                          di esserci incollata. Questo è lo smorzamento
+                          vero: a 1 la scaletta è rigidamente agganciata
+                          alla rotella e ogni strattone si vede tale e
+                          quale; a 0.10 le arriva dietro, con un peso suo, e
+                          una scrollata violenta si legge come una spinta
+                          invece che come uno scatto.
+                          È lo stesso inseguimento che l'Embed del reel usa
+                          per la sua spinta, e per lo stesso motivo.      */
+
+var CURVA = true;      /* smussa partenza e arrivo (smoothstep). La salita
+                          parte piano, prende in mezzo, si posa piano.
+                          false = lineare, cioè parte e si ferma di colpo. */
+
+var SPINTA = 1.60;     /* quanto il testo in alto a sinistra viene spinto
+                          via dalle immagini che salgono, in multipli della
+                          strada minima per uscire dal bordo alto.
+                          1.00 = esce esattamente sul filo a salita finita:
+                          troppo tardi, perché per mezza corsa i riquadri
+                          gli sono già addosso. Sopra 1 sgombera prima, ed è
+                          quello che fa sembrare che sia stato spinto.
+                          0 lo lascia fermo.
+
+                          Non sposta il testo a mano: sposta il rettangolo
+                          vuoto su cui il testo atterra, e il testo lo segue
+                          da solo perché la consegna rilegge quel rettangolo
+                          a ogni fotogramma. Una cosa spostata, non due.   */
+
+var ANTICIPO = 1.70;   /* di quanto la spinta del testo corre avanti alla
+                          salita. La curva del testo è u^(1/ANTICIPO): sopra
+                          1 il testo parte subito e sgombera mentre i
+                          riquadri sono ancora bassi — che è il verso
+                          giusto, perché una cosa spinta si muove PRIMA che
+                          quella che spinge le arrivi addosso, non dopo.
+                          1 = stessa curva della salita.                   */
 
 
 var sec = document.querySelector('[data-reel]');
@@ -85,165 +83,233 @@ var slot = document.querySelector('[data-reel-slot]');
 
 var ridotto = false;
 try{ ridotto = matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
-if(ridotto) return;   /* chi ha chiesto meno movimento tiene la scaletta ferma,
-                         che è già una composizione: la stessa scelta che fa
-                         l'embed del reel poche righe più in là. */
+if(ridotto) return;   /* chi ha chiesto meno movimento tiene la scaletta
+                         ferma, che è già una composizione: la stessa
+                         scelta che fa l'Embed del reel. Niente tenuta e
+                         niente salita.                                   */
+
+
+/* ── la tenuta ───────────────────────────────────────────────────────────
+   La scatola si costruisce una volta sola, subito, prima di qualunque
+   misura: da qui in poi tutto quello che si legge è già nel mondo nuovo.
+   Il genitore della sezione è il <body>, che impila i figli uno sotto
+   l'altro senza flex né grid: infilarci in mezzo una scatola non sposta
+   niente di quello che c'è intorno.                                    */
+
+var scatola = null;
+
+if(TENUTA_VH > 0 && sec.parentNode){
+  scatola = document.createElement('div');
+  scatola.setAttribute('data-reel-tenuta','');
+  sec.parentNode.insertBefore(scatola, sec);
+  scatola.appendChild(sec);
+  sec.style.position = 'sticky';
+  /* `top` e l'altezza della scatola li scrive misura(): dipendono dallo
+     schermo, e vanno rifatti a ogni resize. */
+}
 
 
 /* ── misure ──────────────────────────────────────────────────────────── */
 
-var STACCO = 0, CORSA = 1, VIA = 0, quieto = false, ultimo = -1;
+var ALT = 1, VIA = 0, CORSA = 1, quieto = false;
 
 function misura(){
   /* Si misura sempre da fermo. Se la sezione è uscita dallo schermo mentre
      la salita era a metà, il ciclo si è spento lasciando lo slot spostato:
      rientrando, le misure parlerebbero di dov'è adesso invece che di dove
      sta a riposo, e la spinta si accorcerebbe di quanto era già spinta. È
-     la stessa cautela con cui la consegna fa posa(0) prima di misurarsi.
-     Rimetterlo a posto non si vede: disegna() gira subito dopo. */
+     la stessa cautela con cui la consegna fa posa(0) prima di misurarsi. */
   if(slot && slot.style.transform) slot.style.transform = '';
 
   var vh = window.innerHeight || 1;
-  var rs = sec.getBoundingClientRect();
+  var H  = sec.offsetHeight || vh;
 
-  /* Il fondo che conta è quello della scatola contro cui i riquadri stanno
-     con bottom:0, non quello della sezione: quasi sempre coincidono, ma è
-     la scatola che decide dove cade lo zero. Se ne tiene lo SCARTO dalla
-     sezione, che è una costante, così nel ciclo basta leggere un
-     rettangolo solo — e per giunta lo stesso su cui è tarato il blocco 1,
-     che è il motivo per cui i due parlano dello stesso zero.
-     (Stesso ragionamento per cui l'embed del reel prende OX
-     dall'offsetParent e non dalla sezione.) */
-  var box = riquadri[0].offsetParent || sec;
-  var rb  = box.getBoundingClientRect();
-  STACCO  = rs.bottom - rb.bottom;
-
-  /* La corsa geometrica: quanto scroll separa "il bloccone col fondo sul
-     fondo dello schermo" da "il bloccone col bordo alto in cima". Il
-     bloccone è il riquadro più alto che si vede adesso; si rilegge la sua
-     altezza da quello che ci ha scritto l'embed, che è l'unico a saperla.
-     Si misura qui e non nel ciclo apposta: il nastro gira sempre, il
-     bloccone cresce di continuo, e una corsa che si riaccorcia sotto i
-     piedi mentre scrolli farebbe respirare la salita invece di farla
-     scorrere. Fermo per tutta la passata, rifatto alla prossima. */
-  var hmax = 0;
-  for(var i = 0; i < riquadri.length; i++){
-    var h = parseFloat(riquadri[i].style.height);
-    if(h > hmax) hmax = h;
+  if(scatola){
+    /* La sezione si incolla col PROPRIO FONDO sul fondo dello schermo: è lì
+       che il disegno vuole la scaletta, ed è lo stesso punto in cui il
+       blocco ti fa sedere. Se la sezione è più alta dello schermo il numero
+       viene negativo, ed è ancora giusto: sporge in alto e si incolla col
+       fondo lo stesso. */
+    sec.style.top = (vh - H) + 'px';
+    CORSA = Math.max(1, TENUTA_VH * vh);
+    scatola.style.height = (H + CORSA) + 'px';
+  } else {
+    CORSA = Math.max(1, vh * 0.30);
   }
 
-  /* Il pavimento serve al monitor basso e largo: lì il bloccone può venire
-     più alto dello schermo, la corsa geometrica va a zero o sotto, e senza
-     un minimo la salita si consumerebbe tutta in un pixel di scroll. Non
-     sposta la geometria — a u=1 i bordi alti sono in cima comunque, per
-     come è scritta la formula: cambia solo quanto scroll ci vuole. */
-  CORSA = Math.max(vh * 0.12, (vh - hmax) * ALLUNGA);
+  /* Il fondo su cui i riquadri sono appoggiati è quello della scatola
+     contro cui stanno con bottom:0, non quello della sezione: quasi sempre
+     coincidono, ma è quella a decidere dove cade lo zero — stesso
+     ragionamento per cui l'Embed prende OX dall'offsetParent. */
+  var box = riquadri[0].offsetParent || sec;
+  var rb  = box.getBoundingClientRect();
+  ALT = rb.height || H;
 
-  /* Quanto deve salire lo slot per uscire del tutto dal bordo alto della
-     scatola: la distanza fra quel bordo e il fondo dello slot. */
+  /* La strada perché il TESTO esca dal bordo alto della scatola.
+
+     Non basta misurare lo slot: lo slot è un rettangolo vuoto messo lì per
+     dire dove atterrare, e il blocco che ci atterra sopra — .studio-info —
+     è alto quanto titolo, descrizione, prezzo e bottone messi insieme,
+     cioè quasi sempre molto di più. Spingendo per la sola altezza dello
+     slot, il rettangolo sparisce e il testo resta lì a metà: era questo il
+     motivo per cui non sembrava spinto da niente.
+
+     Si legge l'altezza del blocco, non il suo fondo: al momento della
+     misura può ancora essere fermo sull'hero, e il suo fondo parlerebbe di
+     lassù. Il suo fondo da posato è `cima dello slot + la sua altezza`. */
   VIA = 0;
   if(slot){
-    var rl = slot.getBoundingClientRect();
-    VIA = Math.max(0, rl.bottom - rb.top);
+    var rl    = slot.getBoundingClientRect();
+    var basso = rl.bottom;
+    var info  = document.querySelector('.studio-info');
+    if(info){
+      var ri = info.getBoundingClientRect();
+      if(ri.height) basso = Math.max(basso, rl.top + ri.height);
+    }
+    VIA = Math.max(0, basso - rb.top);
   }
 }
 
 
-/* ── il disegno ──────────────────────────────────────────────────────── */
+/* ── dove siamo ──────────────────────────────────────────────────────────
+   Una lettura di layout per fotogramma, fuori da ogni ciclo.
 
-function disegna(){
+   Con la tenuta: la scatola comincia a scorrere sotto la sezione incollata
+   quando il suo bordo alto passa `vh − H`, e ha finito quando il suo fondo
+   arriva al fondo dello schermo. Fra quei due istanti la sezione non si
+   muove di un pixel, e tutto quello che si vede muoversi è la salita.
+
+   Senza tenuta: si ripiega sul fondo della sezione, come prima.        */
+
+function dove(){
   var vh = window.innerHeight || 1;
+  if(scatola) return (vh - sec.offsetHeight - scatola.getBoundingClientRect().top) / CORSA;
+  return (vh - sec.getBoundingClientRect().bottom) / CORSA;
+}
 
-  /* L'unica lettura di layout del ciclo, e sta fuori dal for: dentro ne
-     costerebbe una per riquadro. È la seconda della sezione in questo
-     fotogramma — l'embed del reel ne fa già una sua — e sono due perché i
-     due cicli non si conoscono. Se un giorno pesasse, la fusione da fare è
-     una sola: far scrivere a quello la u in una variabile e leggerla qui. */
-  var B = sec.getBoundingClientRect().bottom - STACCO;
 
-  var u = (vh - B) / CORSA;
-  if(u < 0) u = 0; else if(u > 1) u = 1;
+/* ── il disegno ──────────────────────────────────────────────────────────
+   Con la sezione ferma, la riga a cui tutto tende è il bordo alto della
+   scatola dei riquadri. Con `h` l'altezza del riquadro e `e` la salita:
 
-  if(u === 0 && ultimo === 0) return;  /* fermi a riposo: non si riscrive niente */
+       bottom = e · (ALT − h)
+
+   A e=0 tutti a zero: la scaletta di sempre.
+   A e=1 ognuno è alzato di tutto quello che lo separava dalla cima, quindi
+   tutti i bordi alti sulla stessa riga: la scala rovescia.
+   A e=0.5 ognuno sta a (ALT−h)/2 dal fondo, cioè col centro a ALT/2: tutti
+   i centri sulla stessa riga. Il disegno di mezzo esce da sé.
+
+   I riquadri piccoli sembrano correre di più, ma non c'è nessuna velocità
+   scritta da nessuna parte: hanno `h` piccolo, quindi (ALT−h) grande,
+   quindi più strada da fare nello stesso tempo.                        */
+
+var ultimo = -1;
+
+function disegna(u){
+  if(u === 0 && ultimo === 0) return;   /* fermi a riposo: non si riscrive niente */
   ultimo = u;
 
-  /* Finita la salita il fondo continua a salire, e una B che continua a
-     rimpicciolire terrebbe i riquadri incollati alla cima dello schermo
-     mentre la pagina gli scorre sotto — un pin che nessuno ha chiesto e
-     che si legge come un blocco. Congelando B al valore che aveva al
-     traguardo, lo scarto resta quello e i riquadri se ne vanno su insieme
-     alla sezione, come è giusto. */
-  var Bfine = vh - CORSA;
-  var Bc = B > Bfine ? B : Bfine;
+  /* Smoothstep: derivata nulla ai due estremi, quindi la salita non parte
+     con uno strappo e non si inchioda all'arrivo. */
+  var e = CURVA ? u * u * (3 - 2 * u) : u;
 
   for(var i = 0; i < riquadri.length; i++){
     var el = riquadri[i];
 
     /* A riposo si CANCELLA la proprietà invece di scriverci 0: così il
-       riquadro torna a stare sul bottom:0 del foglio di stile, e il bordo
-       basso ricade sul pixel intero dove l'embed lo aveva agganciato. È il
-       motivo per cui la scaletta ferma resta pulita esattamente com'è oggi.
+       riquadro torna sul bottom:0 del foglio di stile e il bordo basso
+       ricade sul pixel intero dove l'Embed lo aveva agganciato. È per
+       questo che la scaletta ferma resta pulita esattamente com'era.
        Durante la salita il bordo basso viaggia e un aggancio al pixel non
        avrebbe senso: lì sotto non confina con nessuno — il filo bianco
-       nasce fra due riquadri VICINI, e i vicini stanno di fianco, non
-       sotto. */
-    if(u === 0){
+       nasce fra due riquadri VICINI, e i vicini stanno di fianco. */
+    if(e === 0){
       if(el.style.bottom) el.style.bottom = '';
       continue;
     }
 
-    /* L'altezza la scrive l'embed del reel, fotogramma per fotogramma: si
-       rilegge da lì invece di misurarla, che costerebbe un ricalcolo per
-       riquadro. Se non c'è — l'embed non è partito — non si tocca niente:
-       meglio la scaletta ferma che venti riquadri buttati in cima. */
+    /* L'altezza la scrive l'Embed, fotogramma per fotogramma: si rilegge da
+       lì invece di misurarla, che costerebbe un ricalcolo per riquadro. Se
+       non c'è — l'Embed non è partito — non si tocca niente: meglio la
+       scaletta ferma che venti riquadri buttati in cima. */
     var h = parseFloat(el.style.height);
     if(!h) continue;
 
-    var b = u * (Bc - h);
+    var b = e * (ALT - h);
     el.style.bottom = (b > 0 ? b : 0).toFixed(2) + 'px';
   }
 
   if(slot && !quieto){
-    if(u === 0){ if(slot.style.transform) slot.style.transform = ''; }
-    else slot.style.transform = 'translate3d(0,' + (-u * SPINTA * VIA).toFixed(1) + 'px,0)';
+    if(e === 0){
+      if(slot.style.transform) slot.style.transform = '';
+    } else {
+      /* Il testo corre avanti alla salita: si sposta PRIMA che i riquadri
+         gli arrivino addosso, che è come si comporta una cosa spinta. */
+      var s = (ANTICIPO === 1) ? e : Math.pow(e, 1 / ANTICIPO);
+      slot.style.transform = 'translate3d(0,' + (-s * SPINTA * VIA).toFixed(1) + 'px,0)';
+    }
   }
 }
 
 
-/* ── il ciclo ────────────────────────────────────────────────────────── */
+/* ── il ciclo ────────────────────────────────────────────────────────────
+   Fra lo scroll e la salita c'è un inseguimento, non un aggancio rigido.
+   Il passo è corretto sul tempo trascorso, così a 30 e a 120 fotogrammi al
+   secondo il peso si sente uguale: un inseguimento a passo fisso sarebbe il
+   doppio più lento sul monitor lento, ed è l'errore classico.          */
 
-var vivo = false, gira = false;
+var liscia = 0, vivo = false, gira = false, ultimoT = 0;
 
-function frame(){
+function frame(ora){
   if(!vivo){ gira = false; return; }
   requestAnimationFrame(frame);
-  disegna();
+
+  var dt = (ora - ultimoT) / 1000;
+  ultimoT = ora;
+  if(dt > 0.05)  dt = 0.05;    /* tornati da un'altra scheda: niente salti */
+  if(dt < 0.004) dt = 0.004;
+
+  var u = dove();
+  if(u < 0) u = 0; else if(u > 1) u = 1;
+
+  liscia += (u - liscia) * (1 - Math.pow(1 - MORBIDEZZA, dt * 60));
+
+  /* Senza questo la coda non arriva mai esattamente a zero, e il ritorno
+     alla scaletta pulita — quello che cancella `bottom` — non scatterebbe
+     mai. */
+  if(Math.abs(u - liscia) < 0.0005) liscia = u;
+
+  disegna(liscia);
 }
 
 function accendi(){
   if(gira) return;
-  gira = true;
+  gira    = true;
+  ultimoT = performance.now();
   requestAnimationFrame(frame);
 }
 
 misura();
-disegna();
+liscia = Math.max(0, Math.min(1, dove()));   /* niente scivolata all'avvio se
+                                                la pagina apre già qui dentro */
+disegna(liscia);
 
 new IntersectionObserver(function(es){
   vivo = es[0].isIntersecting;
   if(vivo){ misura(); accendi(); }
-}, { rootMargin:'50% 0px' }).observe(sec);
+}, { rootMargin:'50% 0px' }).observe(scatola || sec);
 
 var rT = null;
 window.addEventListener('resize', function(){
   /* Il blocco che consegna il testo dentro il reel misura la propria corsa
      leggendo dov'è lo slot, e lo fa 150ms dopo il resize. Se in quel
-     momento lo trovasse spostato da noi, si taglierebbe la corsa da solo e
+     momento lo trovasse spostato da noi si taglierebbe la corsa da solo, e
      il testo atterrerebbe corto per sempre. Quindi al primo segnale lo slot
      torna al suo posto e ci resta finché quella misura non è passata: 400 è
      scelto per stare largo oltre i suoi 150. Durante il ridimensionamento
-     il testo non viene spinto — e nessuno se ne accorge, perché stai
-     trascinando l'angolo della finestra. */
+     il testo non viene spinto, e nessuno se ne accorge: stai trascinando
+     l'angolo della finestra. */
   quieto = true;
   if(slot) slot.style.transform = '';
   clearTimeout(rT);
@@ -251,11 +317,11 @@ window.addEventListener('resize', function(){
     misura();
     quieto = false;
     ultimo = -1;
-    disegna();
+    disegna(liscia);
   }, 400);
 }, { passive:true });
 
 /* I font che si caricano e le immagini che arrivano possono cambiare le
    altezze dopo il primo giro di misure. */
-window.addEventListener('load', function(){ misura(); ultimo = -1; disegna(); });
+window.addEventListener('load', function(){ misura(); ultimo = -1; disegna(liscia); });
 })();

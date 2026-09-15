@@ -4,8 +4,8 @@ Due comportamenti della **sezione reel** di The Cape Studio, sulla home.
 
 | File | Cosa è | Peso |
 |---|---|---|
-| `reel-blocco.js` | il magnete che ti riseduta quando arrivi giù di corsa | ~5 KB |
-| `reel-salita.js` | la scaletta che si alza e si rovescia mentre scorri | ~12 KB |
+| `reel-blocco.js` | lo scroll si ferma per mezzo secondo quando arrivi in fondo | ~6 KB |
+| `reel-salita.js` | la sezione si ferma, e la scaletta si alza e si rovescia | ~15 KB |
 
 Sono indipendenti: puoi caricarne uno solo. Nessuno dei due ha dipendenze —
 niente GSAP, niente jQuery. Se in pagina non c'è `[data-reel]` escono subito.
@@ -26,9 +26,6 @@ Al posto di `SHA` va lo SHA per esteso del commit, **mai `@main` né `@latest`**
 quelli li tiene jsDelivr in cache fino a 7 giorni, e dopo una modifica ti
 ritrovi a guardare la versione vecchia chiedendoti perché non cambia niente.
 
-`defer` è quello che serve: i due script cercano elementi che l'Embed dentro la
-sezione ha già costruito mentre la pagina veniva letta.
-
 ---
 
 ## Il markup che si aspettano
@@ -39,7 +36,8 @@ Quello che c'è già nel Designer. Nessun elemento nuovo da creare.
 |---|---|---|
 | `[data-reel]` | la sezione | escono tutti e due, zitti |
 | `.reel-item` | i riquadri del nastro | esce `reel-salita` |
-| `[data-reel-slot]` | il rettangolo su cui atterra il testo | la salita funziona, il testo non viene spinto |
+| `[data-reel-slot]` | il rettangolo su cui atterra il testo | la salita va, il testo non viene spinto |
+| `.studio-info` | il testo che ci atterra sopra | la spinta si calcola sul solo slot, e resta corta |
 
 `reel-salita` **non** sposta il testo: sposta lo slot. Il testo lo segue da
 solo, perché il blocco della consegna rilegge `slot.getBoundingClientRect()` a
@@ -48,98 +46,132 @@ sapere dell'altro.
 
 ---
 
-## reel-blocco.js — il magnete
+## reel-blocco.js — il fermo
 
-L'ancora è la posizione in cui il **fondo del reel si appoggia al fondo dello
-schermo**. Chi ci arriva di corsa e la sfonda viene riportato lì con una tirata
-di 0.7s. È lo stesso meccanismo che `.cape-hs-wrap` ha ai suoi due bordi, con
-gli stessi numeri.
+Arrivato in fondo alla sezione lo scroll si **ferma**. Non è uno snap: non ti
+sposta di un pixel e non ti riporta da nessuna parte. Ti toglie la corsa. Per
+proseguire devi ricominciare a scrollare.
 
-Una differenza, e non è un capriccio: là il magnete è sempre acceso, qui **si
-spegne appena ha fatto il suo lavoro** e si riarma solo quando sei risalito
-sopra la sezione. Deve essere così perché subito dopo l'ancora comincia la
-salita: un magnete ancora acceso ti ritirerebbe indietro ogni volta che ti fermi
-a guardarla, e l'effetto non lo vedresti mai.
+Con Lenis è `stop()` e poi `start()`. La parte che conta è che `stop()` **azzera
+la velocità**: alla ripartenza non c'è nessuna inerzia residua da riprendere.
+Un semplice "ignora gli eventi per N ms" non basterebbe — lascerebbe l'inerzia
+intatta e la pagina ripartirebbe da sola appena finito.
+
+Senza Lenis (telefono, Firefox) la stessa cosa è fatta a mano: si rifiuta ogni
+rotella e ogni dito con `preventDefault`, e se qualcosa scorre lo stesso —
+tastiera, barra di scorrimento — lo si rimette dov'era.
 
 | Manopola | Default | Cosa fa |
 |---|---|---|
-| `BANDA_SU` | `0.28` | frazione di schermo: quanto **prima** dell'ancora comincia a tirare |
-| `BANDA_GIU` | `0.45` | e quanto **dopo**. Più larga, perché chi arriva di corsa sfonda l'ancora: è la ragione per cui il blocco esiste |
-| `RIARMO` | `1.20` | schermate sopra la sezione per cui il magnete torna acceso |
-| `ATTESA` | `30` | ms di quiete prima di tirare: finché la rotella gira non ti tocca |
-| `DURATA` | `0.70` | secondi della tirata |
-| `DA_992` | `true` | solo desktop. Su touch una scrollata programmata in mezzo a un lancio di dito si sente come uno strappo |
+| `MS` | `420` | quanto dura il fermo. Sotto ~200 non si legge come una pausa ma come un incespicare; sopra ~700 sembra che il sito sia impallato |
+| `SOGLIA` | `0.00` | dove scatta, in schermate oltre il fondo della sezione. `0` = a salita completata |
+| `RIARMO` | `0.60` | schermate da risalire perché torni carico. Scatta una volta per passaggio |
+| `DA_992` | `true` | solo desktop: su touch il dito è già staccato quando la pagina scorre per inerzia, e togliergli la corsa lì si sente come un aggancio rotto |
 
-Usa Lenis se c'è, e lo aspetta fino a 8 secondi prima di ripiegare sullo scroll
-nativo — attaccarsi a `window.scroll` mentre Lenis è vivo vuol dire leggere la
-posizione un fotogramma in ritardo.
+La soglia si legge sul fondo della **scatola** della tenuta, non della sezione:
+con la tenuta attiva la sezione sta immobile per tutta la salita, e prenderla
+come riferimento vorrebbe dire non scattare mai. Senza tenuta le due coincidono
+e il conto non cambia.
 
 ---
 
-## reel-salita.js — la salita
+## reel-salita.js — la tenuta e la salita
 
-Una legge sola, e i tre stati vengono da lì. Con `B` la distanza fra il bordo
-alto dello schermo e il fondo su cui i riquadri sono appoggiati, `h` l'altezza
-del riquadro, `u` quanto sei avanzato (0 = fermo sull'ancora, 1 = finita):
+### Come si allunga la sezione
+
+`TENUTA_VH` — schermate di scroll in cui la sezione **resta ferma** mentre la
+salita si consuma. Di serie `1.60`.
+
+È l'unico modo giusto di darle più respiro. Alzarne l'altezza nel Designer non
+lo sarebbe: l'Embed del reel calcola il suo gradino come `altezza della sezione
+× 0.185`, quindi una sezione più alta non dà più tempo — dà **riquadri più
+grandi**, e a 200vh sarebbero grandi il doppio dello schermo. Qui la sezione
+resta alta uguale e a cambiare è solo quanto scroll ci vuole per attraversarla:
+la geometria del nastro non se ne accorge.
+
+Come lo fa: la sezione viene infilata in una scatola alta `altezza + TENUTA` e
+resa `sticky`, incollata col proprio fondo sul fondo dello schermo. È lo stesso
+schema di `.cape-hs-wrap`, che sta due sezioni più su e fa esattamente questo.
+`TENUTA_VH = 0` spegne tutto: niente scatola, niente sticky, la sezione torna a
+scorrere.
+
+### La legge
+
+Con `ALT` l'altezza della scatola dei riquadri, `h` l'altezza del riquadro e
+`e` quanto sei avanzato:
 
 ```
-bottom = u · (B − h)
+bottom = e · (ALT − h)
 ```
 
-- **u = 0** — tutti a zero: la scaletta di sempre, intatta.
-- **u = 0.5** — ognuno sta a `(B−h)/2` dal fondo, cioè il suo centro sta a
-  `B/2`: tutti i centri sulla stessa riga.
-- **u = 1** — ogni riquadro è alzato di tutto quello che lo separava dalla cima:
-  tutti i bordi alti sulla stessa riga, la scala rovescia.
+- **e = 0** — tutti a zero: la scaletta di sempre, intatta.
+- **e = 0.5** — ognuno sta a `(ALT−h)/2` dal fondo, cioè col centro a `ALT/2`:
+  tutti i centri sulla stessa riga.
+- **e = 1** — ognuno è alzato di tutto quello che lo separava dalla cima: tutti
+  i bordi alti sulla stessa riga, la scala rovescia.
 
 I riquadri piccoli sembrano correre di più, ma non c'è nessuna velocità scritta
-da nessuna parte: hanno `h` piccolo, quindi `(B−h)` grande, quindi più strada da
-fare nello stesso tempo. Arrivano insieme per costruzione. Il riquadro che
+da nessuna parte: hanno `h` piccolo, quindi `(ALT−h)` grande, quindi più strada
+da fare nello stesso tempo. Arrivano insieme per costruzione. Il riquadro che
 rinasce a sinistra grande zero non ha bisogno di un caso speciale: `h≈0` → sale
-di tutta `B`, cioè nasce in cima e cresce verso il basso.
+di tutta `ALT`, cioè nasce in cima e cresce verso il basso.
 
-**La riga a cui tutto tende è il bordo alto dello SCHERMO, non quello della
-sezione.** È la differenza che conta: nel punto in cui il magnete ti ferma la
-sezione riempie già l'inquadratura, quindi il suo bordo alto esce di scena al
-primo pixel di scroll, e una salita puntata lì finirebbe fuori campo.
+Con la sezione ferma, niente viene tagliato: la corsa può durare quanto vuoi.
 
 | Manopola | Default | Cosa fa |
 |---|---|---|
-| `ALLUNGA` | `1.00` | quanto dura la salita, in multipli della corsa **geometrica** |
-| `SPINTA` | `1.00` | quanto il testo viene spinto via. `1` = a fine salita è uscito dal bordo alto della sezione. `0` = sta fermo |
+| `TENUTA_VH` | `1.60` | schermate di scroll in cui la sezione resta ferma |
+| `MORBIDEZZA` | `0.10` | quanto la salita **insegue** lo scroll invece di esserci incollata |
+| `CURVA` | `true` | smussa partenza e arrivo (smoothstep) |
+| `SPINTA` | `1.60` | quanto il testo viene spinto oltre il bordo alto |
+| `ANTICIPO` | `1.70` | di quanto la spinta del testo corre avanti alla salita |
 
-### La corsa non è un numero scelto a mano
+### Lo smorzamento
 
-È misurata: il bloccone parte col fondo sul fondo dello schermo e finisce col
-bordo alto in cima, quindi la corsa è *altezza dello schermo meno altezza del
-bloccone*. Si riadatta a ogni monitor da sola.
+`MORBIDEZZA` è la manopola che toglie la nevrosi. A `1` la scaletta è
+rigidamente agganciata alla rotella e ogni strattone si vede tale e quale; a
+`0.10` le arriva dietro, con un peso suo, e una scrollata violenta si legge come
+una spinta invece che come uno scatto. È lo stesso inseguimento che l'Embed del
+reel usa per la sua spinta, e per lo stesso motivo.
 
-`ALLUNGA` è un moltiplicatore su quella. Sopra `1.00` la salita dura di più e si
-legge meglio scrollando piano, ma i riquadri più alti arrivano in cima quando il
-fondo della sezione è già risalito sopra il loro bordo basso, e la sezione — che
-ritaglia — glielo taglia. È il prezzo, ed è graduale.
+Il passo è corretto sul tempo trascorso, così a 30 e a 120 fotogrammi al secondo
+il peso si sente uguale. Un inseguimento a passo fisso sarebbe il doppio più
+lento sul monitor lento, ed è l'errore classico.
 
-C'è un pavimento a `0.12` schermate, per il monitor basso e largo dove il
-bloccone può venire più alto dello schermo e la corsa geometrica andrebbe a
-zero. Non sposta la geometria: a `u=1` i bordi alti sono in cima comunque, per
-come è scritta la formula. Cambia solo quanto scroll ci vuole.
+`CURVA` fa il resto: derivata nulla ai due estremi, quindi la salita non parte
+con uno strappo e non si inchioda all'arrivo.
+
+### La spinta del testo
+
+`SPINTA` si misura sul **testo**, non sullo slot. Lo slot è un rettangolo vuoto
+messo lì per dire dove atterrare; il blocco che ci atterra sopra —
+`.studio-info` — è alto quanto titolo, descrizione, prezzo e bottone messi
+insieme, cioè quasi sempre molto di più. Misurando il solo slot, il rettangolo
+sparisce e il testo resta lì a metà: è esattamente il motivo per cui non
+sembrava spinto da niente.
+
+`ANTICIPO` dà alla spinta una curva sua, `e^(1/ANTICIPO)`. Sopra `1` il testo
+parte subito e sgombera mentre i riquadri sono ancora bassi — che è il verso
+giusto, perché una cosa spinta si muove **prima** che quella che spinge le
+arrivi addosso, non dopo. Con i default il testo è già fuori dallo schermo a
+metà corsa.
 
 ---
 
 ## Note
 
-- Finita la salita i riquadri **non restano incollati** in cima: `B` viene
-  congelata al valore del traguardo, così se ne vanno su insieme alla sezione
-  invece di comportarsi come un pin che nessuno ha chiesto.
 - A riposo `bottom` viene **cancellata**, non messa a zero: il riquadro torna sul
   `bottom:0` del foglio di stile e il bordo basso ricade sul pixel intero dove
   l'Embed lo aveva agganciato. È per questo che la scaletta ferma resta pulita
   esattamente com'era.
+- La scatola della tenuta si infila fra `<body>` e la sezione. Il body impila i
+  figli uno sotto l'altro senza flex né grid, quindi non sposta niente di quello
+  che c'è intorno.
 - Durante un resize lo slot torna al suo posto per 400 ms: il blocco della
   consegna misura la propria corsa leggendo dov'è lo slot, e lo fa 150 ms dopo il
   resize. Se lo trovasse spostato si taglierebbe la corsa da solo.
-- `prefers-reduced-motion: reduce` spegne tutti e due. La scaletta resta ferma,
-  che è già una composizione.
+- `prefers-reduced-motion: reduce` spegne tutti e due. Niente tenuta e niente
+  salita: la scaletta resta ferma, che è già una composizione.
 - I cicli sono due, e due sono le letture di layout per fotogramma: questi non si
   conoscono con l'Embed del reel. Se un giorno pesasse, la fusione da fare è una
   sola — far scrivere all'Embed la `u` in una variabile e leggerla qui.
