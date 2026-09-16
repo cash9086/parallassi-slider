@@ -29,7 +29,7 @@ var SOSTA_VH  = 0.80; /* LA TENUTA — schermate di scroll in cui, arrivati in
                          Scatta all'INIZIO della parallassi — riquadri tutti
                          sul bordo basso — e non alla fine.                */
 
-var SALITA_VH = 1.60; /* schermate di scroll in cui la salita si consuma,
+var SALITA_VH = 1.00; /* schermate di scroll in cui la salita si consuma,
                          DOPO che la tenuta è finita. La sezione resta ferma
                          anche qui: a muoversi sono solo i riquadri.
 
