@@ -1,14 +1,16 @@
 # parallassi-slider
 
-La **sezione reel** di The Cape Studio, sulla home: arrivati in fondo lo scroll
-si blocca per un tratto, e poi la scaletta si alza e si rovescia.
+Gli script di scroll della home di The Cape Studio che non stanno più nel
+custom code della pagina, perché là lo spazio è finito.
 
 | File | Cosa è | Peso |
 |---|---|---|
-| `reel-salita.js` | la tenuta e la salita | ~16 KB |
+| `reel-salita.js` | la sezione reel: la tenuta e la salita | ~16 KB |
+| `cape-open.js` | la sezione `.cape-open`: la tendina del video e le righe del titolo | ~6 KB |
 
-Un file solo, nessuna dipendenza — niente GSAP, niente jQuery. Se in pagina non
-c'è `[data-reel]` esce subito e non costa niente.
+Nessuna dipendenza — niente GSAP, niente jQuery. Ognuno controlla da solo se la
+sua sezione è in pagina, e se non c'è esce subito senza costare niente. Sono
+indipendenti: nessuno dei due sa dell'altro.
 
 ---
 
@@ -170,3 +172,69 @@ metà salita.
 - C'era anche un `reel-blocco.js` che fermava lo scroll a tempo con
   `lenis.stop()`. Era una funzione inventata da zero, e la tenuta la rende
   inutile: è stato tolto. Sta nella storia della repo al commit `e877be9`.
+
+---
+
+## `cape-open.js`
+
+L'ultima sezione: il titolo (THE ART / WE CRAFT / PROUDLY) si srotola riga per
+riga, e poi il video si apre a tendina dal bordo basso dello schermo.
+
+### Il markup che si aspetta
+
+| Selettore | Serve a | Se manca |
+|---|---|---|
+| `.cape-open` | la sezione | esce, zitto |
+| `.cape-open-type` | il blocco alto 100vh che contiene il titolo | niente calibrazione, resta il valore CSS |
+| `.cape-open-lines` | il blocco delle tre righe | si ripiega sul binario, come faceva prima |
+| `.cape-open-rail` | il binario | niente tendina, restano solo le righe che salgono |
+| `.cape-open-media` | il `<video>` | niente riproduzione; se l'indirizzo non c'è la tendina sparisce |
+| `.cape-open-line` | le singole righe | niente srotolamento |
+
+Il vestito sta nell'head della pagina: le manopole `--corsa`, `--sosta`, `--w0`,
+`--w1`, e il `calc()` che traduce `--p` in larghezza e altezza della fessura.
+Qui c'è solo chi scrive `--p`.
+
+### `--p` si legge dal testo, non dal binario
+
+    p = (--corsa − fondo di .cape-open-lines) / --corsa
+
+Il binario è un oggetto invisibile che comincia dove gli dice `--anticipo`; il
+fondo di PROUDLY è la cosa che guardi. Legando il video al secondo invece che al
+primo, il traguardo del video e quello del testo cadono insieme per costruzione,
+su qualunque schermo, e nessuno dei due deve indovinare dov'è l'altro.
+
+Siccome in quel tratto il testo percorre `--corsa` e il video ne percorre 100vh,
+quella manopola è anche il rapporto fra le due velocità:
+
+| `--corsa` | cosa fa |
+|---|---|
+| `100vh` | il video sale insieme al testo: il bordo alto resta incollato al fondo della parola |
+| `50vh` | il doppio. Parte a metà schermo, arriva in cima insieme al testo, e per strada ricuce il mezzo schermo di bianco che si era lasciato sotto |
+| `33vh` | il triplo: parte tardi e recupera di scatto |
+
+### Perché `--anticipo` lo calcola il codice
+
+`--anticipo` decide quando `.cape-open-stage` si incolla in cima. Deve essere già
+incollato quando il video parte, altrimenti la tendina si aprirebbe sotto il
+bordo basso dello schermo e non la vedresti. Il numero giusto è
+
+    --anticipo = (vuoto sotto il testo dentro .cape-open-type) + --corsa
+
+e quel vuoto non è una costante: il testo è alto in px (150px per riga) e il
+blocco che lo contiene è alto in vh, quindi su una finestra bassa il vuoto è
+~18vh e su una alta ~30vh. Un numero scritto nel CSS sarebbe giusto su un
+monitor solo. Si misura, e si riscrive **solo col binario ancora sotto il bordo
+basso**: cambiare `margin-top` accorcia la pagina, e farlo mentre ci sei dentro
+te la farebbe scattare sotto le dita. Il valore nel CSS resta come ripiego per
+il caso in cui il codice non parta.
+
+### Note
+
+- Le righe del titolo si riarmano ogni volta che la sezione esce dallo schermo,
+  come fa `.cape-hs-wrap`: risalendo la trovi di nuovo pronta.
+- `prefers-reduced-motion: reduce` spegne binario e srotolamento. Il video resta
+  aperto e il titolo è già lì — è l'head a vestirlo così.
+- Se il `<video>` non ha indirizzo o non si carica, la sezione prende `is-muto` e
+  la tendina sparisce del tutto: meglio niente che un buco nero in mezzo alla
+  pagina.
