@@ -7,10 +7,13 @@ custom code della pagina, perché là lo spazio è finito.
 |---|---|---|
 | `reel-salita.js` | la sezione reel: la tenuta e la salita | ~16 KB |
 | `cape-open.js` | la sezione `.cape-open`: la tendina del video e le righe del titolo | ~6 KB |
+| `camera-oscura.js` | la sezione `.stage-wrap`: bruciatura, frase, firma, sviluppo, ritiro | ~21 KB |
 
-Nessuna dipendenza — niente GSAP, niente jQuery. Ognuno controlla da solo se la
-sua sezione è in pagina, e se non c'è esce subito senza costare niente. Sono
-indipendenti: nessuno dei due sa dell'altro.
+`reel-salita.js` e `cape-open.js` non hanno dipendenze — niente GSAP, niente
+jQuery. `camera-oscura.js` invece vuole GSAP e ScrollTrigger già caricati, ed è
+l'unico. Ognuno controlla da solo se la sua sezione è in pagina, e se non c'è
+esce subito senza costare niente. Sono indipendenti: nessuno dei tre sa degli
+altri.
 
 ---
 
@@ -238,3 +241,103 @@ il caso in cui il codice non parta.
 - Se il `<video>` non ha indirizzo o non si carica, la sezione prende `is-muto` e
   la tendina sparisce del tutto: meglio niente che un buco nero in mezzo alla
   pagina.
+
+---
+
+## `camera-oscura.js`
+
+La sezione fra l'hero e lo scroll orizzontale. Sostituisce due cose che prima
+erano separate: il pannello bianco che si apriva a fessura (`.section-intro`) e
+il ponte a tessere (`.cape-bridge`).
+
+La fotografia dell'hero si brucia fino al bianco; sul bianco si riempie una
+frase e si scrive una firma; poi la stessa fotografia si sviluppa di nuovo e si
+ritira dentro l'immagine della prima slide dell'orizzontale. Dodici fasi, una
+sola corsa di scroll, un solo blocco `sticky`.
+
+### Come si include
+
+Nel footer della Home, **dopo** Lenis e **dopo** i due tag di GSAP:
+
+```html
+<script defer src="https://cdn.jsdelivr.net/gh/cash9086/parallassi-slider@SHA/camera-oscura.js"></script>
+```
+
+Vuole anche il CSS di `.stage-wrap` nell'head della pagina — quello è rimasto
+lì, perché un foglio di stile caricato da fuori arriva dopo il primo disegno e
+per un istante si vedrebbero i quattro strati impilati uno sotto l'altro.
+
+### La tabella delle fasi
+
+È la sola sorgente dei numeri: da lì escono l'altezza del wrapper, il margine
+negativo e la durata di ogni cosa. Il tempo della timeline è misurato in
+schermate — **una unità di GSAP = un vh di scroll** — quindi i numeri nel file
+sono gli stessi che leggi qui, senza conversioni da sbagliare.
+
+| # | fase | vh | cosa succede |
+|---|---|---|---|
+| 1 | `hero` | 100 | l'hero si sfila da sotto, la foto è ferma |
+| 2 | `pausa1` | 40 | foto piena, la silhouette si spegne |
+| 3 | `bruciatura` | 80 | `brightness` 1→6, velo bianco nell'ultimo 30% |
+| 4 | `frase` | 100 | le parole si accendono in fila |
+| 5 | `firma` | 40 | la penna scrive |
+| 6 | `pausa2` | 30 | |
+| 7 | `fraseVia` | 30 | la frase svanisce sul posto |
+| 8 | `firmaVia` | 50 | la firma resta sola, poi svanisce |
+| 9 | `bianco` | 30 | bianco vuoto |
+| 10 | `sviluppo` | 120 | il velo se ne va, il filtro torna normale |
+| 11 | `pausa3` | 40 | foto piena |
+| 12 | `ritiro` | 100 | la foto si ritira dentro la prima slide |
+
+Totale 760vh, e il wrapper è alto 100vh di più: quelli se li mangia lo sticky.
+
+### Perché la fase 1 non anima niente
+
+È la schermata in cui l'hero esce mentre il blocco è **già** incollato, con la
+stessa identica fotografia. Il margine negativo del wrapper vale esattamente
+quella fase: il blocco si incolla nell'istante in cui l'hero comincia a
+sfilarsi, e siccome il punto d'arrivo della foto dell'hero (`object-position:
+50% 50%`, `brightness(1)`) è il punto di partenza di questa, il passaggio di
+consegne non si vede.
+
+### Le manopole
+
+| Manopola | Default | Cosa fa |
+|---|---|---|
+| `VELO_DA` | `0.70` | dove entra il velo bianco, dentro la bruciatura |
+| `BRUCIA` | `6` | fin dove schiarisce |
+| `CONTRA` | `0.80` | il contrasto da cui la foto si sviluppa |
+| `DERIVA` | `16` | px di discesa lenta della foto lungo tutta la corsa |
+| `PALE` | `0.14` | l'inchiostro spento delle parole |
+| `SOVRAP` | `0.40` | quanto una parola parte prima che finisca la precedente |
+
+### Tre cose che non si deducono leggendo
+
+- **Il filtro sta sul contenitore, non sulle immagini.** La silhouette
+  scontornata e la foto sotto sono due ritagli dello stesso soggetto:
+  bruciandole separatamente il pixel di bordo prende la schiaritura due volte e
+  resta un alone lungo il perimetro. Un contenitore, un filtro, una passata.
+- **La deriva muove `object-position`, non un `transform`.** A transform la
+  foto uscirebbe dal proprio riquadro e lascerebbe una striscia vuota sul
+  bordo: con `cover` il margine non c'è su tutti e due gli assi.
+  `object-position` sposta il ritaglio *dentro* l'immagine e si ferma da solo
+  quando il margine finisce.
+- **Alla fine del ritiro le due fotografie si scambiano il posto.** Al
+  traguardo la nostra combacia con quella della slide; lì la nostra si nasconde
+  e `.image-14` si riaccende. Senza lo scambio, appena il blocco si scolla la
+  nostra se ne andrebbe con lui e sotto resterebbe un buco, perché `.image-14`
+  è ancora spenta da `is-ponte`.
+
+### I muri dell'orizzontale
+
+In fondo al file c'è un blocco che con la camera oscura non c'entra niente:
+i muri di ingresso e di uscita di `.cape-hs-wrap`, quelli che impediscono di
+arrivare lanciati dentro lo scroll laterale. Vivevano nell'Embed del ponte, e
+il ponte non c'è più. Leggono solo `.cape-hs-wrap`: se un giorno trovano una
+casa migliore, si spostano da soli senza toccare il resto.
+
+### `prefers-reduced-motion`
+
+Non una versione lenta della stessa cosa: un'altra cosa. Niente bruciatura,
+niente deriva, niente sviluppo — solo dissolvenze brevi, e la corsa lunga un
+terzo.
