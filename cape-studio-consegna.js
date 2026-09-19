@@ -258,7 +258,7 @@ function init(){
 
   /* ——— il viaggio ————————————————————————————————————————————————— */
   var p = 0, armato = false, montata = false, tlMontaggio = null;
-  var cloneChars = [], vivo = false, girando = false, ultimo = 0;
+  var cloneChars = [], vivo = false, girando = false, ultimo = 0, primo = true;
 
   function vestiClone(){
     var cs = getComputedStyle(titolo);
@@ -305,6 +305,20 @@ function init(){
     if(ink && typeof ink.progress === 'number' && ink.ready && ink.progress < 0.92) return;
 
     armato = true;
+
+    /* Da qui in avanti la planata — lo script che ricentra la sezione quando
+       lo scroll si ferma vicino — deve stare ferma, e non solo durante il
+       montaggio: durante il VIAGGIO la sezione e' a meta' schermo e il rig
+       orizzontale e' gia' passato, cioe' esattamente le condizioni in cui
+       quella scatta. Scattando, porterebbe la sezione al centro in sette
+       decimi di secondo e il viaggio del titolo finirebbe li', tutto
+       insieme, senza che nessuno abbia scrollato. L'interruttore lo aveva
+       gia': sta fermo finche' il documento porta is-consegna.
+
+       A montaggio finito si toglie: li' la sezione e' incollata al centro,
+       la planata calcola una distanza di zero e non fa niente comunque. */
+    document.documentElement.classList.add('is-consegna');
+
     vestiClone();
     cloneChars = spezza(testoInk());
     clone.classList.add('is-on');
@@ -321,6 +335,7 @@ function init(){
   function disarma(){
     if(!armato) return;
     armato = false;
+    document.documentElement.classList.remove('is-consegna');
     clone.classList.remove('is-on');
     if(velo) velo.classList.remove('is-on');
   }
@@ -468,11 +483,6 @@ function init(){
     if(montata) return;
     montata = true;
 
-    /* La planata — lo script che ricentra la sezione quando lo scroll si
-       ferma vicino — ha gia' un interruttore per questo: sta ferma finche'
-       il documento porta is-consegna. */
-    document.documentElement.classList.add('is-consegna');
-
     var nuove = studio.chars;
     if(nuove.length) gsap.set(nuove, { opacity: 0 });
 
@@ -508,7 +518,12 @@ function init(){
     if(!montata) return;
     montata = false;
     if(tlMontaggio){ tlMontaggio.kill(); tlMontaggio = null; }
-    document.documentElement.classList.remove('is-consegna');
+    /* Si torna al viaggio, quindi la planata torna ferma — l'aveva liberata
+       la fine del montaggio. Senza questa riga, appena il fade e' finito
+       scatterebbe e riporterebbe la sezione al centro, annullando lo scroll
+       in su che l'utente ha appena fatto. Si libera di nuovo in disarma(),
+       quando il titolo e' tornato all'inchiostro. */
+    document.documentElement.classList.add('is-consegna');
     studio.hold();
 
     var nuove = studio.chars;
@@ -569,6 +584,13 @@ function init(){
     ultimo = t;
 
     var b = bersaglio();
+
+    /* Il primissimo fotogramma non insegue: ci si mette. Chi ricarica la
+       pagina gia' dentro la sezione — o ci arriva con un'ancora — altrimenti
+       vedrebbe il titolo partire dal centro dello schermo e volare al suo
+       posto senza aver scrollato di un pixel. Da li' in poi lo smorzamento
+       vale come sempre. */
+    if(primo){ primo = false; p = b; }
     var tau = 0.02 + (1 - MORBIDEZZA) * 0.33;
     p = p + (b - p) * (1 - Math.exp(-dt / tau));
     if(Math.abs(b - p) < 0.0015) p = b;
@@ -577,7 +599,10 @@ function init(){
 
     if(armato) piazza(CURVA ? morbida(p) : p);
 
-    if(p >= 0.9995) monta(); else if(p <= 0.97) smonta();
+    /* La soglia di smontaggio non e' 0.999 per non essere in balia di un
+       colpo di trackpad: sotto i 0.93 vuol dire che la sezione ha davvero
+       ricominciato a scendere, non che la rotella ha tremato. */
+    if(p >= 0.9995) monta(); else if(p <= 0.93) smonta();
 
     requestAnimationFrame(giro);
   }
