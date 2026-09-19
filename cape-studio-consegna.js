@@ -295,6 +295,18 @@ function init(){
 
   if(!sez || !titolo || !guscio || !stage) return;
 
+  /* Il footer tiene un registro dei patti fra blocchi: chi scrive una classe
+     e chi la legge. Finche' questo file non si dichiarava, capePatti() dava
+     is-consegna per "nessuno lo scrive" — un falso allarme su un patto che
+     invece regge tutta la consegna. Si dichiara qui e non piu' in alto
+     perche' e' qui che il patto esiste davvero: se la sezione non c'e', o si
+     e' sotto i 992, nessuno scrive niente e l'allarme e' giusto. */
+  window.capePatti && capePatti.dichiara('consegna dall\'inchiostro', {
+    scrivo: [['is-consegna', 'html',
+              'mentre il titolo viaggia dall\'inchiostro allo slider la planata sta ferma']],
+    leggo:  ['window.capeStudio', 'window.inkSection']
+  });
+
   vesti();
 
   var studio = window.capeStudio;
