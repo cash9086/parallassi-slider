@@ -484,6 +484,9 @@ function init(){
   var p = 0, armato = false, montata = false, tlMontaggio = null;
   var cloneChars = [], vivo = false, girando = false, ultimo = 0, primo = true;
   var assestata = false;
+  /* usciti dalla tenuta in su: il montaggio resta chiuso finche' non si
+     rientra o non si torna al viaggio. Vedi la guardia in giro(). */
+  var uscito = false;
 
   function vestiClone(){
     var cs = getComputedStyle(titolo);
@@ -557,6 +560,56 @@ function init(){
     return largoBase;
   }
 
+  /* Il corpo scritto nel CSS non e' quello che si vede.
+
+     L'inchiostro non impagina il titolo: se lo ridisegna dentro la propria
+     griglia, e per farlo lo riscala. In cape-ink-title.js, dentro scoglio():
+
+         k = w / rect.width          w = larghezza della griglia in celle
+                                     rect = il riquadro di .ink-title
+         corpo = fontSize * k
+
+     e poi la griglia viene stirata sul canvas, che sta a inset:0 dentro
+     .ink-stick. Mettendo insieme i due passaggi, quello che finisce sullo
+     schermo e'
+
+         corpo visto = fontSize * larghezza-canvas / larghezza-.ink-title
+
+     cioe' il corpo del CSS SOLO SE i due riquadri coincidono. Se il titolo
+     e' un filo piu' largo del suo pilastro, la scritta dipinta esce piu'
+     piccola di quanto il CSS dica — e il clone, che il CSS lo legge e basta,
+     esce piu' grande di quella frazione esatta. Sovrapponendo le due scritte
+     la differenza misurata era dell'1.3% in larghezza e dell'1.3% in altezza:
+     un ingrandimento uniforme, la firma di un rapporto di riquadri.
+
+     Qui quel rapporto si rimette dentro la misura, una volta sola. */
+  function scalaInk(){
+    if(!titInk || !stkInk) return 1;
+    var cv = stkInk.querySelector('canvas');
+    if(!cv) return 1;
+    var wc = cv.getBoundingClientRect().width;
+    var wt = titInk.getBoundingClientRect().width;
+    if(!(wc > 0) || !(wt > 0)) return 1;
+    var k = wc / wt;
+    /* Se il rapporto e' lontano da uno non e' lo scarto di cui sopra: e' un
+       titolo dentro una colonna, o un canvas che non e' quello. Fidarsene
+       farebbe un danno piu' grosso di quello che ripara. */
+    return (k > 0.8 && k < 1.25) ? k : 1;
+  }
+
+  /* Il centro di cio' che l'inchiostro dipinge, adesso. Si rilegge a ogni
+     fotogramma apposta: il pilastro si muove, e il punto d'arrivo del
+     viaggio deve muoversi con lui. */
+  function centroInk(){
+    var cv = stkInk && stkInk.querySelector('canvas');
+    if(cv){
+      var r = cv.getBoundingClientRect();
+      if(r.width > 0 && r.height > 0)
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    }
+    return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+  }
+
   function misuraInk(){
     if(inkMis) return inkMis;
     if(!titInk) return null;
@@ -572,13 +625,17 @@ function init(){
     for(i = 0; i < testo.length; i++) w += c.measureText(testo[i]).width + sp;
     if(testo.length) w -= sp;
     if(!(w > 0)) return null;
+    /* Tutto quello che e' una LUNGHEZZA va portato da com'e' scritto nel CSS
+       a com'e' dipinto sullo schermo. La spaziatura no: e' gia' espressa in
+       multipli del corpo, e corpo e spaziatura si riscalano insieme. */
+    var k = scalaInk();
     inkMis = {
-      largo: w,
-      corpo: F,
+      largo: w * k,
+      corpo: F * k,
       /* l'altezza delle maiuscole: e' QUESTA la misura che l'occhio legge
          come "quanto e' grande la scritta", e l'unica indipendente dalla
          spaziatura */
-      cap: c.measureText('H').actualBoundingBoxAscent || F * 0.7,
+      cap: (c.measureText('H').actualBoundingBoxAscent || F * 0.7) * k,
       /* la spaziatura in multipli del corpo, per poterla prestare al clone */
       spEm: sp / F
     };
@@ -769,8 +826,19 @@ function init(){
     var anc = ancora();
     var cx0 = B.left + anc * B.width + (0.5 - anc) * largo;
     var cy0 = B.top + centroMaiuscole(F, L);
-    var cx  = cx0 + (window.innerWidth / 2  - cx0) * u;
-    var cy  = cy0 + (window.innerHeight / 2 - cy0) * u;
+    /* E da dove parte: NON il centro dello schermo — il centro del canvas.
+       Sono la stessa cosa solo finche' il pilastro dell'inchiostro e'
+       incollato, e proprio nell'istante dello scambio puo' non esserlo piu':
+       lo scambio aspetta che il fluido sia a fondo corsa, che con la coda di
+       fabbrica cade sull'ultimo pixel della sezione — cioe' esattamente dove
+       il pilastro comincia a sfilarsi. Da li' in poi le lettere dipinte
+       salgono con lui e il clone resta fermo a meta' schermo: al banco sono
+       trenta pixel di scarto verticale. Si legge il riquadro vero, che e'
+       anche la definizione che usa chi dipinge (centrato in w/2, h/2 della
+       griglia, e la griglia sta a inset:0 nello stick). */
+    var C   = centroInk();
+    var cx  = cx0 + (C.x - cx0) * u;
+    var cy  = cy0 + (C.y - cy0) * u;
 
     /* Le lettere dell'inchiostro sono #141416 — e' il colore della slide che
        si vede attraverso, non una scelta — e il titolo del carosello
@@ -1065,18 +1133,38 @@ function init(){
 
     if(armato) piazza(CURVA ? morbida(p) : p);
 
+    var r = inRiserva();
+
+    /* L'uscita anticipata, dentro la tenuta. La fetta si arma solo dopo
+       esserne usciti almeno una volta: il montaggio avviene a riserva zero,
+       quindi senza questa guardia lo smontaggio scatterebbe nell'istante
+       stesso in cui la sezione finisce di montarsi.
+
+       E poi la guardia 'uscito', che e' quella che mancava. Uscendo dalla
+       tenuta scrollando in su, il VIAGGIO e' ancora a fondo corsa: p vale 1,
+       e continua a valere 1 per tutta la dissolvenza. La riga del montaggio
+       qui sotto guarda solo p, quindi al fotogramma successivo allo
+       smontaggio rimontava tutto da capo — velo che rifaceva la scivolata a
+       sbieco, righe che risalivano, cornice che si riaccendeva — sopra una
+       dissolvenza appena partita. E' il difetto che si vedeva: la roba
+       rifaceva l'entrata, e poi spariva di colpo quando il viaggio scendeva
+       davvero sotto 0.93.
+
+       Uscito dalla tenuta, quindi, il montaggio resta chiuso. Si riapre in
+       due modi soli, che sono i due modi veri di tornare ad aver senso:
+       rientrando nella tenuta (si scrolla di nuovo in giu': coreografia da
+       capo, com'e' giusto) oppure tornando indietro fino al viaggio, dove
+       p non vale piu' 1 e il montaggio e' comunque fuori questione. */
+    if(p <= 0.93 || r > USCITA_R + 0.12) uscito = false;
+    if(r > USCITA_R + 0.12) assestata = true;
+
     /* La soglia di smontaggio non e' 0.999 per non essere in balia di un
        colpo di trackpad: sotto i 0.93 vuol dire che la sezione ha davvero
        ricominciato a scendere, non che la rotella ha tremato. */
-    if(p >= 0.9995) monta(); else if(p <= 0.93) smonta();
+    if(p >= 0.9995){ if(!uscito) monta(); }
+    else if(p <= 0.93) smonta();
 
-    /* E l'uscita anticipata, dentro la tenuta. La fetta si arma solo dopo
-       esserne usciti almeno una volta: il montaggio avviene a riserva zero,
-       quindi senza questa guardia lo smontaggio scatterebbe nell'istante
-       stesso in cui la sezione finisce di montarsi. */
-    var r = inRiserva();
-    if(r > USCITA_R + 0.12) assestata = true;
-    if(montata && assestata && r < USCITA_R) smonta();
+    if(montata && assestata && r < USCITA_R){ uscito = true; smonta(); }
 
     requestAnimationFrame(giro);
   }
