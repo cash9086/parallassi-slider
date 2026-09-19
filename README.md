@@ -8,12 +8,19 @@ custom code della pagina, perché là lo spazio è finito.
 | `reel-salita.js` | la sezione reel: la tenuta e la salita | ~16 KB |
 | `cape-open.js` | la sezione `.cape-open`: la tendina del video e le righe del titolo | ~6 KB |
 | `camera-oscura.js` | la sezione `.stage-wrap`: bruciatura, frase, firma, sviluppo, ritiro | ~21 KB |
+| `cape-studio-consegna.js` | il titolo della sezione a inchiostro diventa il titolo dello slider studio | ~24 KB |
 
 `reel-salita.js` e `cape-open.js` non hanno dipendenze — niente GSAP, niente
-jQuery. `camera-oscura.js` invece vuole GSAP e ScrollTrigger già caricati, ed è
-l'unico. Ognuno controlla da solo se la sua sezione è in pagina, e se non c'è
-esce subito senza costare niente. Sono indipendenti: nessuno dei tre sa degli
-altri.
+jQuery. `camera-oscura.js` vuole GSAP e ScrollTrigger già caricati.
+`cape-studio-consegna.js` vuole GSAP (solo il core) e, unico in questa repo,
+**non è indipendente**: chiama i gesti che `cape-studio-carousel.js` espone su
+`window.CapeStudio`, e va caricato dopo di lui. Se non lo trova aspetta due
+secondi e poi lo dice in console invece di restare zitto. Legge anche, se c'è,
+la mappa di arrivo dell'inchiostro su `window.inkSection`: se non c'è, ripiega
+e funziona lo stesso.
+
+Ognuno controlla da solo se la sua sezione è in pagina, e se non c'è esce
+subito senza costare niente.
 
 ---
 
@@ -341,3 +348,112 @@ casa migliore, si spostano da soli senza toccare il resto.
 Non una versione lenta della stessa cosa: un'altra cosa. Niente bruciatura,
 niente deriva, niente sviluppo — solo dissolvenze brevi, e la corsa lunga un
 terzo.
+
+
+---
+
+## `cape-studio-consegna.js` — la consegna
+
+La scritta gigante della sezione a inchiostro e il titolo dello slider studio
+erano due scritte diverse in due sezioni diverse. Adesso sono **la stessa
+scritta**: quella dell'inchiostro scende, si mette al posto del titolo dello
+slider, e lì diventa il titolo dell'opera.
+
+### Cosa succede, nell'ordine
+
+1. **Lo scambio.** L'inchiostro finisce e al centro dello schermo resta
+   `ART AND FASHION` — che non è testo, è il buco che l'inchiostro non ha
+   riempito. Quel buco è dipinto dentro il canvas e col canvas se ne andrebbe,
+   quindi il canvas viene coperto da un velo bianco — invisibile, perché sotto
+   è già tutto bianco — e al suo posto compare un clone di testo vero, fermo
+   sullo schermo, nello stesso punto e della stessa misura. Sotto una
+   dissolvenza di 180 ms.
+2. **Il viaggio.** La sezione studio sale da sotto, il clone la insegue. La
+   destinazione viene **riletta a ogni fotogramma** dal rettangolo vero di
+   `.studio-headline__row`: l'atterraggio è esatto a qualunque misura di
+   schermo e con qualunque impaginazione, anche dopo il prossimo ritocco nel
+   Designer.
+3. **Il montaggio**, tutto nello stesso istante: l'onda di luce sul titolo,
+   la tendina di descrizione e bottone, la tendina della barra, e il velo
+   bianco sul riquadro che se ne va con la scivolata del cambio immagine —
+   sotto si apre il buco con dentro la fotografia.
+4. **L'uscita.** Scrollando in su tutto svanisce in dissolvenza e il titolo
+   rifà il viaggio al contrario, fino a riconsegnarsi all'inchiostro.
+   Rientrando, la coreografia si rifà e il carosello riprende dall'opera su
+   cui era rimasto.
+
+### L'onda di luce
+
+Non ha una fisica sua: **è la fisica dell'inchiostro**. Per ogni lettera
+chiede a `window.inkSection.arrivalAt(u, v)` — la stessa mappa che ha appena
+dipinto la sezione sopra — a che punto della corsa il fluido sarebbe arrivato
+in quel punto dello schermo. Le lettere quindi non si accendono da sinistra a
+destra: si accendono nell'ordine irregolare, a grumi, in cui quel fluido le
+avrebbe raggiunte.
+
+Non costa niente: la mappa è già cotta e il modulo la tiene in cache dopo la
+prima lettura, che qui viene fatta apposta all'inizio del viaggio invece che a
+metà dell'onda.
+
+Se `window.inkSection` non c'è — niente WebGL2 su quella macchina, o il file
+dell'inchiostro non caricato — l'onda ripiega su un ordine da sinistra a
+destra con un filo di disordine. Non è la stessa cosa, ma la sezione non resta
+senza titolo.
+
+### Le manopole
+
+Tutte in cima al file. Le due che contano sono le stesse due di
+`reel-salita.js`, e vogliono dire la stessa cosa.
+
+| Manopola | Default | Cosa fa |
+|---|---|---|
+| `VIAGGIO_VH` | `1.00` | schermate di scroll in cui il titolo viaggia. È una finestra **ritagliata sulla salita naturale** della sezione, non scroll aggiunto |
+| `SOSTA_VH` | `1.00` | la tenuta: schermate in cui, a titolo arrivato, la sezione sta ferma incollata mentre le animazioni girano. È **l'unico scroll che questa coreografia aggiunge alla pagina** |
+| `MORBIDEZZA` | `0.14` | quanto il viaggio insegue lo scroll invece di esserci incollato |
+| `CURVA` | `true` | smussa partenza e arrivo del viaggio |
+| `SCAMBIO` | `0.18` | secondi della dissolvenza con cui il clone prende il posto del buco. Sotto 0.10 lo scambio comincia a vedersi |
+| `LUCE_DUR` | `1.15` | secondi dell'onda di luce |
+| `LUCE_ORLO` | `0.30` | larghezza del fronte di luce, in frazione dell'onda. Stretto = un lampo che corre; largo = mezzo titolo acceso insieme |
+| `USCITA` | `0.45` | secondi della dissolvenza scrollando in su |
+| `MIN_W` | `992` | sotto questa larghezza non fa niente |
+
+I tempi delle tendine e della scivolata **non sono qui**: li chiede al
+carosello. Se un domani cambia la durata della tendina nel suo blocco
+`IMPOSTAZIONI`, cambia anche qui, da sola.
+
+### Cosa si aggiunge alla pagina
+
+Quattro nodi, tutti creati dal JS — **niente da fare nel Designer**:
+
+| Nodo | Dove | A cosa serve |
+|---|---|---|
+| `.cnsg-riserva` | subito dopo `.studio-hero` | la tenuta |
+| `.cnsg-velo` | dentro `.ink-stick` | copre le lettere del canvas durante lo scambio |
+| `.cnsg-titolo` | in fondo al `<body>` | il clone che viaggia |
+| `.cnsg-coperta` | dentro `.studio-stage` | il velo bianco sulle fotografie |
+
+Più il contenuto di `.studio-pager`, che viene avvolto in una finestra perché
+possa salire da dietro il proprio bordo.
+
+Lo stile di tutti e quattro sta nel custom code della head della Home, blocco
+*la consegna*. Se quel blocco non c'è, il JS gira ma non si vede niente.
+
+### Trappole
+
+- **La sezione diventa `position: sticky`.** Il `top` lo scrive il JS
+  misurando l'altezza vera. Lo script che ricentra la sezione quando lo scroll
+  si ferma vicino sta fermo durante il montaggio: aveva già l'interruttore,
+  `html.is-consegna`, e questo file lo usa.
+- **Il punto in cui la sezione si incolla si misura dalla riserva, non dalla
+  sezione.** Su un elemento incollato il rettangolo sullo schermo e la catena
+  degli `offsetTop` non concordano su tutti i browser; la riserva è un div
+  fermo e non ha quel problema.
+- **Il clone sta su una riga sola.** Il titolo dell'inchiostro, sotto i
+  ~1300px, va a capo: lì il clone si ferma al 94% della larghezza dello
+  schermo invece di riprodurre un'impaginazione che è scritta nello shader e
+  non nel CSS. Sopra i 1400px la misura è identica all'inchiostro.
+- **Il centro è quello delle maiuscole, non quello della riga.** Il motore
+  dell'inchiostro centra così, e un titolo tutto maiuscolo centrato sulla riga
+  siede basso. Se le due cose non combaciassero, allo scambio la scritta
+  salterebbe — di pochi pixel, ma nell'unico fotogramma in cui la si sta
+  guardando.
