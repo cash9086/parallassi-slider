@@ -551,3 +551,47 @@ titolo continuava a scendere per **840 px** dopo che la sezione era già ferma,
 e la coreografia partiva con la tenuta quasi consumata. Adesso agli estremi il
 `tau` si stringe, il ritardo ha un tetto (0.20, lo stesso freno che
 `ink-transition.js` mette al suo scrub) e l'ultimo 3% si chiude.
+
+
+### Il breakpoint che cambia tutto
+
+`.studio-hero` ha un layout completamente diverso al breakpoint **xl (≥1440px)**,
+che è quello che gira sulla maggior parte degli schermi: `.studio-info` passa a
+sinistra ed è larga 55vw invece di 15, e `.studio-headline__row` prende
+`width: 80%` e PP Editorial New. Leggere solo il breakpoint base — come ho fatto
+per tre giri — vuol dire lavorare su una geometria che sullo schermo non esiste.
+
+Da qui due conseguenze scritte nel codice:
+
+**La destinazione sono le lettere, non la scatola.** Con `width: 80%` il
+rettangolo di `.studio-headline__row` è largo ottocento pixel buoni e con la
+scritta dentro non c'entra niente. Il clone ci atterrava sopra spostato. Adesso
+si misura l'unione dei rettangoli dei `.studio-char` — che *è* la scritta — e si
+atterra su quella.
+
+**L'allineamento si riconosce, non si assume.** Il clone e il titolo dell'opera
+sono due stringhe di lunghezza diversa: se la sezione allinea a sinistra devono
+cominciare nello stesso punto, se centra devono avere lo stesso centro. Lo dice
+il confronto fra il rettangolo delle lettere e quello della scatola, non il
+foglio di stile — che andrebbe riletto a ogni breakpoint. Verificato sui tre
+casi: bordi a 0 px con `left`, centri a 0 px con `center`, bordi destri a 0 px
+con `right`.
+
+**E la tipografia non si tocca.** Al breakpoint xl il titolo è già PP Editorial
+New, messo nel Designer. La regola che questo file iniettava vinceva per
+specificità e si portava dietro anche la spaziatura: `-0.02em` diventava
+`.02em`, e la crenatura cambiava senza che nessuno l'avesse chiesto. `FONT_TITOLO`
+adesso è vuoto.
+
+### Lo scambio si fa mentre l'inchiostro è ancora fermo
+
+Fra l'istante in cui l'inchiostro finisce e quello in cui comincia il viaggio ci
+sono una settantina di pixel di scroll, e in quei pixel la sezione a inchiostro
+si è già sfilata portandosi via le sue lettere. La dissolvenza avveniva così fra
+due scritte che non erano più nello stesso posto: si vedeva la vecchia scivolare
+in su mentre la nuova stava ferma — il doppio titolo.
+
+Adesso il clone si accende appena l'inchiostro è a fondo corsa (progresso 0.995,
+misurato: dodici pixel prima che si sfili), al centro dello schermo, esattamente
+sopra le lettere che il fluido sta ancora dipingendo. Verificato: centro a 959
+su 959, centro delle maiuscole a 436 su 438, e fermo lì per tutta la dissolvenza.

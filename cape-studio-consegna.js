@@ -89,7 +89,7 @@ var MORBIDEZZA = 0.14; /* 0..1 — quanto il viaggio insegue lo scroll invece
 var CURVA      = true; /* smussa partenza e arrivo del viaggio (smoothstep).
                           false = il titolo parte e si ferma di colpo.      */
 
-var SCAMBIO    = 0.18; /* secondi della dissolvenza con cui il clone prende
+var SCAMBIO    = 0.12; /* secondi della dissolvenza con cui il clone prende
                           il posto del buco nell'inchiostro. Sotto i 0.10 lo
                           scambio comincia a vedersi come uno stacco.       */
 
@@ -111,19 +111,17 @@ var MIN_W      = 992;  /* sotto questa larghezza non si fa niente.          */
 /* ——— le due scelte di aspetto ————————————————————————————————————
    Non sono plumbing, sono decisioni, e stanno qui dove si vedono.
 
-   CARATTERE: il titolo dell'inchiostro e quello dello slider erano due
-   caratteri diversi. Siccome adesso la stessa scritta passa dall'uno
-   all'altro senza mai sparire, un cambio a meta' strada si leggerebbe come
-   un errore. Il nome e' quello con cui Webflow ha registrato il font, hash
-   compreso: all'upload se lo ricava dal nome del file. Sembra un refuso e
-   non lo e' — scritto "PP Editorial New" il titolo resta senza font. E' la
-   stessa riga che sta in cape-title-ink.js.
-   A stringa vuota, il titolo dello slider resta con il suo carattere.
+   CARATTERE: sta a zero, e deve restarci. Al breakpoint xl il titolo dello
+   slider e' GIA' PP Editorial New, messo nel Designer. Un'altra regola qui
+   che dice la stessa cosa vincerebbe per specificita' e si porterebbe dietro
+   anche peso e spaziatura — cioe' -0.02em che diventa .02em, e la crenatura
+   del titolo cambia senza che nessuno l'abbia chiesto. Si riempie solo se un
+   domani quel font sparisce dal Designer.
 
    FONDO: il motore dell'inchiostro dipinge #ffffff pieno. Con il #fbfaf7
    della sezione, sul raccordo si vedrebbe un gradino di colore proprio
    mentre il titolo ci passa sopra. */
-var FONT_TITOLO = '"Ppeditorialnew Bf 644 B 21500 D 0 C 0", Georgia, serif';
+var FONT_TITOLO = '';   /* vuoto = non si tocca. Vedi la nota qui sopra. */
 var PESO_TITOLO = '200';
 var SPAZ_TITOLO = '.02em';
 var FONDO_SEZ   = '#ffffff';
@@ -552,6 +550,14 @@ function init(){
     if(s && s.ready && typeof s.arrivalAt === 'function'){ try{ s.arrivalAt(0.5, 0.5); }catch(e){} }
   }
 
+  /* L'inchiostro ha finito di coprire? Senza inchiostro in pagina la
+     domanda non ha senso e si torna a decidere col solo viaggio. */
+  function inkAFondo(){
+    var s = window.inkSection;
+    if(!s || typeof s.progress !== 'number' || !s.ready) return false;
+    return s.progress >= 0.995;
+  }
+
   function disarma(){
     if(!armato) return;
     armato = false;
@@ -563,9 +569,56 @@ function init(){
   /* Il clone impaginato sul titolo vero, e poi riportato indietro dov'era
      l'inchiostro. Il punto fermo della scala e' il centro delle maiuscole:
      cosi' ingrandire non sposta la scritta, la ingrandisce e basta. */
+  /* ——— dove stanno DAVVERO le lettere del titolo dello slider —————————
+     Non il rettangolo dell'elemento: quello, al breakpoint xl, ha
+     width:80% — una scatola larga ottocento pixel buoni che con il testo
+     dentro non c'entra niente, e il cui centro non e' il centro della
+     scritta. Il clone ci atterrava sopra spostato di una cinquantina di
+     pixel, ed e' il salto che si vede a fine viaggio.
+
+     Il carosello spezza il titolo in .studio-char: l'unione dei loro
+     rettangoli e' la scritta, esattamente. Misurare quella toglie di mezzo
+     width, text-align, breakpoint e qualunque cosa il Designer decida
+     domani. Se le lettere non ci sono ancora, si ripiega sulla scatola. */
+  function scatolaTitolo(){
+    var ch = titolo.querySelectorAll('.studio-char');
+    if(!ch.length) return titolo.getBoundingClientRect();
+    var l = Infinity, r = -Infinity, t = Infinity, i, q;
+    for(i = 0; i < ch.length; i++){
+      q = ch[i].getBoundingClientRect();
+      if(!q.width && !q.height) continue;
+      if(q.left < l) l = q.left;
+      if(q.right > r) r = q.right;
+      if(q.top < t) t = q.top;
+    }
+    if(!(r > l)) return titolo.getBoundingClientRect();
+    return { left: l, top: t, width: r - l, height: 0 };
+  }
+
+  /* ——— com'e' allineata la scritta dentro la sua scatola ————————————
+     Lo dice il confronto fra i due rettangoli, non il foglio di stile: un
+     valore letto dal CSS andrebbe riletto a ogni breakpoint, e i breakpoint
+     di questa sezione cambiano il layout da cima a fondo.
+
+     Serve perche' il clone e il titolo dell'opera sono due stringhe di
+     lunghezza diversa — ART AND FASHION contro TRACE OF A VISAGE. Se la
+     sezione allinea a sinistra devono cominciare nello stesso punto; se
+     centra devono avere lo stesso centro. Sbagliare vuol dire vedere la
+     scritta saltare di lato proprio nell'istante in cui si posa.
+
+     Torna 0 per sinistra, 0.5 per centrato, 1 per destra. */
+  function ancora(){
+    var box = titolo.getBoundingClientRect();
+    var L = scatolaTitolo();
+    var spazio = box.width - L.width;
+    if(!(L.width > 0) || spazio < 2) return 0.5;   /* riempie: si equivalgono */
+    var a = (L.left - box.left) / spazio;
+    return a < 0.25 ? 0 : (a > 0.75 ? 1 : 0.5);
+  }
+
   function piazza(q){
-    var B  = titolo.getBoundingClientRect();
-    if(!B.width || !B.height) return;
+    var B  = scatolaTitolo();
+    if(!B.width) return;
     var cs = getComputedStyle(titolo);
     var F  = parseFloat(cs.fontSize) || 1;
     var L  = parseFloat(cs.lineHeight) || F;
@@ -584,8 +637,11 @@ function init(){
     if(k > tetto) k = tetto;
     if(!(k > 0)) k = 1;
 
-    var cx = B.left + B.width / 2;              /* dove arriva: centro del titolo */
-    var cy = B.top + perno;                     /* ...e centro delle sue maiuscole */
+    /* Dove arriva: il punto in cui si poserebbe una scritta larga come la
+       nostra, allineata come sono allineate le altre. */
+    var anc = ancora();
+    var cx = B.left + anc * B.width + (0.5 - anc) * largo;
+    var cy = B.top + perno;                     /* centro delle sue maiuscole */
     var dx = window.innerWidth / 2  - cx;       /* da dove parte: centro schermo   */
     var dy = window.innerHeight / 2 - cy;
     var u  = 1 - q;
@@ -849,7 +905,21 @@ function init(){
     else if(b <= 0 && p < 0.03) p = 0;
     else if(Math.abs(b - p) < 0.0015) p = b;
 
-    if(p > 0.0015) arma(); else if(p <= 0.0005) disarma();
+    /* Lo scambio va fatto MENTRE l'inchiostro e' ancora incollato, non
+       quando comincia il viaggio: fra i due momenti ci sono una settantina
+       di pixel di scroll, e in quei pixel la sezione a inchiostro si e' gia'
+       sfilata portandosi via le sue lettere. La dissolvenza da 180 ms
+       avveniva cosi' fra due scritte che non erano piu' nello stesso posto —
+       si vedeva la vecchia scivolare in su mentre la nuova stava ferma, ed
+       e' il doppio titolo che si legge nel video.
+
+       Armandosi appena l'inchiostro e' a fondo corsa, il clone si accende al
+       centro dello schermo — q e' ancora 0 — cioe' esattamente sopra le
+       lettere che il fluido sta ancora dipingendo. La dissolvenza passa fra
+       due scritte sovrapposte, e non si vede. */
+    var finito = inkAFondo();
+    if(p > 0.0015 || finito) arma();
+    else if(p <= 0.0005 && !finito) disarma();
 
     if(armato) piazza(CURVA ? morbida(p) : p);
 
