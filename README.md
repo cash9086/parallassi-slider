@@ -435,7 +435,7 @@ Quattro nodi, tutti creati dal JS — **niente da fare nel Designer**:
 
 | Nodo | Dove | A cosa serve |
 |---|---|---|
-| `.cnsg-riserva` | subito dopo `.studio-hero` | la tenuta |
+| `.cnsg-pin` + `.cnsg-stick` | attorno a `.studio-hero` | la scatola e l'elemento incollato: la tenuta |
 | `.cnsg-velo` | dentro `.ink-stick` | copre le lettere del canvas durante lo scambio |
 | `.cnsg-titolo` | in fondo al `<body>` | il clone che viaggia |
 | `.cnsg-coperta` | dentro `.studio-stage` | il velo bianco sulle fotografie |
@@ -507,3 +507,47 @@ metà coreografia, con le fotografie ancora sotto il velo. `SOSTA_VH` da 1.00 a
 1.60, e un secondo osservatore che, se la sezione esce davvero dallo schermo a
 coreografia in corso, la porta a fondo corsa — così tornando indietro la si
 trova montata e non a metà.
+
+
+### Il rig: scatola e incollato, non sezione incollata
+
+La prima versione faceva `position: sticky` direttamente su `.studio-hero`.
+Non può reggere: **sticky è limitato dal riquadro del genitore**, e il genitore
+qui è il `body`. Una sezione incollata al body non si stacca più — resta
+appesa per tutto il resto della pagina — e quello che si vede è una sezione
+che non sta né ferma né insieme alle altre.
+
+Adesso la sezione entra in una scatola più alta di lei e dentro la scatola si
+incolla: `.cnsg-pin > .cnsg-stick > .studio-hero`. È lo schema di
+`.ink-pin > .ink-stick` e di `.cape-hs-wrap > .cape-hs-sticky`, cioè quello
+che in questa pagina funziona già tre volte. La tenuta è alta esattamente
+quanto la riserva e poi finisce, perché finisce la scatola.
+
+Misurato: **1704 px di tenuta** su 1740 attesi, montaggio che parte 48 px dopo
+l'inizio della tenuta e finisce dentro.
+
+### La scala si misura, non si deduce
+
+Sul corpo di `.ink-title` ci sono **due regole in gara** — quella del custom
+code della pagina (`clamp(44px, 13vw, 200px)`) e quella che
+`cape-title-ink.js` inietta a runtime (`150px`) — e chi vince dipende
+dall'ordine in cui i file finiscono di caricare. Leggere un numero da lì vuol
+dire scommettere su una gara, ed è il motivo per cui allo scambio le due
+scritte erano di grandezze visibilmente diverse.
+
+Adesso si misura la **larghezza resa**, con la stessa API che usa lo shader
+(`measureText`, carattere per carattere, stessa spaziatura), e la scala del
+clone è il rapporto fra quella larghezza e la sua. Due scritte larghe uguale
+sono grandi uguale, qualunque cosa dicano i fogli di stile.
+
+Misurato allo scambio: inchiostro 1392 px, clone 1384 px — **0,6% di scarto** —
+e i due centri coincidono al pixel.
+
+### Il peso non deve costare l'arrivo
+
+Lo smorzamento serve mentre il viaggio è in corso. Quando il bersaglio è a
+fondo corsa non serve più e costa soltanto: dopo una scrollata veloce il
+titolo continuava a scendere per **840 px** dopo che la sezione era già ferma,
+e la coreografia partiva con la tenuta quasi consumata. Adesso agli estremi il
+`tau` si stringe, il ritardo ha un tetto (0.20, lo stesso freno che
+`ink-transition.js` mette al suo scrub) e l'ultimo 3% si chiude.

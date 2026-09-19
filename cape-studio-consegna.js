@@ -65,17 +65,20 @@ var VIAGGIO_VH = 1.00; /* schermate di scroll in cui il titolo viaggia dal
                           titolo resta fermo al centro piu' a lungo e poi
                           scatta giu' in fretta.                            */
 
-var SOSTA_VH   = 1.60; /* LA TENUTA — schermate di scroll in cui, a titolo
+var SOSTA_VH   = 2.00; /* LA TENUTA — schermate di scroll in cui, a titolo
                           arrivato, la sezione sta ferma incollata mentre le
                           animazioni girano. E' l'unico scroll che questa
                           coreografia AGGIUNGE alla pagina.
 
                           Era 1.00 e non bastava: il montaggio dura quasi due
                           secondi — onda, tendine, scivolata del velo — e una
-                          schermata di riserva si consuma in poco piu' di uno.
-                          La sezione se ne andava a meta' coreografia, con le
-                          fotografie ancora sotto il velo. Se la accorci,
-                          accorcia anche LUCE_DUR.                          */
+                          schermata di riserva si consuma in poco piu' di
+                          uno. La sezione se ne andava a meta' coreografia,
+                          con le fotografie ancora sotto il velo.
+
+                          E' la manopola da girare per prima se la sezione
+                          ti sembra che si fermi troppo: portala a 1.4 e
+                          accorcia LUCE_DUR nella stessa misura.            */
 
 var MORBIDEZZA = 0.14; /* 0..1 — quanto il viaggio insegue lo scroll invece
                           di esserci incollato. E' lo stesso inseguimento
@@ -90,7 +93,7 @@ var SCAMBIO    = 0.18; /* secondi della dissolvenza con cui il clone prende
                           il posto del buco nell'inchiostro. Sotto i 0.10 lo
                           scambio comincia a vedersi come uno stacco.       */
 
-var LUCE_DUR   = 1.15; /* secondi dell'onda di luce sul titolo.             */
+var LUCE_DUR   = 0.95; /* secondi dell'onda di luce sul titolo.             */
 
 var LUCE_ORLO  = 0.30; /* larghezza del fronte di luce, in frazione
                           dell'onda. Stretto = un lampo netto che corre;
@@ -162,10 +165,13 @@ function vesti(){
   var st = document.createElement('style');
   st.id = 'cape-consegna-css';
   st.textContent = [
-    /* La sezione si incolla al centro. Il --cnsg-top lo scrive il JS
-       misurando l'altezza vera. */
-    '.cnsg-sez{position:sticky;top:var(--cnsg-top,0px)' +
-      (FONDO_SEZ ? ';background:' + FONDO_SEZ : '') + '}',
+    /* La scatola alta e l'elemento incollato dentro: e' lo schema di
+       .ink-pin > .ink-stick e di .cape-hs-wrap > .cape-hs-sticky, cioe'
+       quello che in questa pagina funziona gia' tre volte. Altezze e top li
+       scrive il JS, che le misure ce le ha. */
+    '.cnsg-pin{position:relative;width:100%}',
+    '.cnsg-stick{position:sticky;width:100%}',
+    (FONDO_SEZ ? '.cnsg-sez{background:' + FONDO_SEZ + '}' : ''),
 
     /* Il titolo dello slider prende il carattere dell'inchiostro. Spaziatura
        e peso sono quelli dell'inchiostro, non quelli che aveva il Bodoni:
@@ -174,10 +180,6 @@ function vesti(){
     (FONT_TITOLO ? '.cnsg-sez .studio-headline__row{font-family:' + FONT_TITOLO +
       ';font-weight:' + PESO_TITOLO + ';letter-spacing:' + SPAZ_TITOLO + '}' : ''),
 
-    /* La riserva: lo scroll in cui, a titolo arrivato, la sezione sta ferma
-       mentre le animazioni girano. Bianca come la sezione sopra: qualunque
-       altro colore si vedrebbe come una striscia su uno schermo alto. */
-    '.cnsg-riserva{position:relative;width:100%;background:#ffffff;pointer-events:none}',
 
     /* Il velo sul canvas dell'inchiostro. Serve a coprire le LETTERE, non il
        bianco: il bianco sotto c'e' gia', ed e' per questo che accendersi non
@@ -240,8 +242,9 @@ function vesti(){
        qualsiasi cosa; questa e' la rete per chi restringe la finestra a
        sezione gia' montata. */
     '@media (max-width:991px),(prefers-reduced-motion:reduce){',
-      '.cnsg-sez{position:relative;top:auto}',
-      '.cnsg-riserva,.cnsg-velo,.cnsg-titolo,.cnsg-coperta{display:none}',
+      '.cnsg-pin{height:auto}',
+      '.cnsg-stick{position:static;height:auto}',
+      '.cnsg-velo,.cnsg-titolo,.cnsg-coperta{display:none}',
       '.cnsg-attesa .studio-headline,.cnsg-attesa .studio-info,',
       '.cnsg-attesa .studio-pager,.cnsg-attesa .studio-stage__edge{',
       'opacity:1;pointer-events:auto}}'
@@ -281,9 +284,23 @@ function init(){
      rig si sfascerebbe in silenzio. */
   sez.classList.add('cnsg-sez', 'cnsg-attesa');
 
-  var riserva = document.createElement('div');
-  riserva.className = 'cnsg-riserva';
-  sez.parentNode.insertBefore(riserva, sez.nextSibling);
+  /* La sezione entra in una scatola piu' alta di lei, e dentro la scatola si
+     incolla. La prima versione incollava direttamente .studio-hero, senza
+     scatola, e non poteva reggere: position:sticky e' limitato dal riquadro
+     del GENITORE, e il genitore qui e' il body. Una sezione incollata al body
+     non si stacca piu' — resta appesa per tutto il resto della pagina — e
+     quello che si vede e' una sezione che non sta ne' ferma ne' insieme alle
+     altre.
+
+     Con la scatola, la tenuta e' alta esattamente quanto la riserva e poi
+     finisce, perche' finisce la scatola. */
+  var pin = document.createElement('div');
+  pin.className = 'cnsg-pin';
+  var stick = document.createElement('div');
+  stick.className = 'cnsg-stick';
+  sez.parentNode.insertBefore(pin, sez);
+  pin.appendChild(stick);
+  stick.appendChild(sez);
 
   /* Il velo bianco sull'inchiostro. Sta DENTRO .ink-stick, non fisso sullo
      schermo: cosi' copre esattamente il canvas, scorre via insieme a lui, e
@@ -373,6 +390,7 @@ function init(){
 
   function misura(){
     var h = sez.offsetHeight || window.innerHeight;
+    if(window.innerWidth < MIN_W){ pin.style.height = ''; stick.style.height = ''; return; }
     /* Il centraggio puo' essere NEGATIVO, e deve poterlo essere.
 
        La sezione e' alta 52vw. Su uno schermo 16:9 pieno ci sta; dentro una
@@ -388,19 +406,20 @@ function init(){
        e sotto: meta' per uno, dove non c'e' niente da vedere. position:sticky
        accetta un top negativo senza fare storie. */
     topIncollo = Math.round((window.innerHeight - h) / 2);
-    sez.style.setProperty('--cnsg-top', topIncollo + 'px');
     viaggio  = Math.max(1, VIAGGIO_VH * window.innerHeight);
     sosta    = Math.max(0, SOSTA_VH * window.innerHeight);
-    riserva.style.height = sosta + 'px';
+
+    stick.style.top    = topIncollo + 'px';
+    stick.style.height = h + 'px';
+    pin.style.height   = (h + sosta) + 'px';
     met = met || metriche();
   }
 
-  /* A che punto dello scroll la sezione si incolla. Si misura dalla RISERVA,
-     non dalla sezione: la riserva e' un div fermo, la sezione e' incollata, e
-     su un elemento incollato le due misure che il DOM offre — il rettangolo
-     sullo schermo e la catena degli offsetTop — non concordano su tutti i
-     browser. La riserva sta subito sotto, quindi il suo bordo alto meno
-     l'altezza della sezione e' il bordo alto naturale della sezione, sempre.
+  /* A che punto dello scroll la sezione si incolla. Si misura dalla SCATOLA,
+     che non si incolla mai: il suo bordo alto e' il bordo alto naturale della
+     sezione, sempre e su qualunque browser. Sull'elemento incollato invece le
+     due misure che il DOM offre — il rettangolo sullo schermo e la catena
+     degli offsetTop — non concordano dappertutto.
 
      Si rifa' a ogni fotogramma apposta: costa una misura e vale contro tutto
      quello che sopra puo' ancora cambiare altezza — un'immagine che arriva,
@@ -408,8 +427,9 @@ function init(){
      una volta sola diventerebbe sbagliato senza dare segno. */
   function bersaglio(){
     var y = window.scrollY || window.pageYOffset;
-    var h = sez.offsetHeight || window.innerHeight;
-    var naturale = riserva.getBoundingClientRect().top + y - h;
+    /* dalla SCATOLA, che non si incolla mai: il suo bordo alto e' il bordo
+       alto naturale della sezione, sempre e su qualunque browser */
+    var naturale = pin.getBoundingClientRect().top + y;
     var inizio = naturale - topIncollo - viaggio;
     return clamp01((y - inizio) / viaggio);
   }
@@ -442,6 +462,42 @@ function init(){
       if(ch !== ' ') out.push(s);
     }
     return out;
+  }
+
+  /* ——— quanto e' grande, sullo schermo, la scritta che l'inchiostro dipinge
+     Non si deduce dal corpo dichiarato. Sul corpo di .ink-title ci sono due
+     regole in gara — quella del custom code della pagina e quella che
+     cape-title-ink.js inietta a runtime — e chi vince dipende dall'ordine in
+     cui i file finiscono di caricare. Leggere un numero da li' vuol dire
+     scommettere su una gara.
+
+     Quindi si misura la LARGHEZZA RESA, con la stessa API che usa lo shader
+     (measureText, carattere per carattere, con la stessa spaziatura) sullo
+     stesso elemento e con lo stesso testo. La scala del clone diventa il
+     rapporto fra quella larghezza e la sua: due scritte larghe uguale sono
+     grandi uguale, qualunque cosa dicano i fogli di stile.
+
+     E' il motivo per cui allo scambio le due scritte erano di grandezze
+     visibilmente diverse. */
+  var inkMis = null;
+
+  function misuraInk(){
+    if(inkMis) return inkMis;
+    if(!titInk) return null;
+    var c;
+    try{ c = document.createElement('canvas').getContext('2d'); }catch(e){ return null; }
+    if(!c) return null;
+    var cs = getComputedStyle(titInk);
+    var F = parseFloat(cs.fontSize) || 150;
+    c.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + F + 'px ' + cs.fontFamily;
+    var testo = testoInk();
+    var sp = cs.letterSpacing === 'normal' ? 0 : (parseFloat(cs.letterSpacing) || 0);
+    var w = 0, i;
+    for(i = 0; i < testo.length; i++) w += c.measureText(testo[i]).width + sp;
+    if(testo.length) w -= sp;
+    if(!(w > 0)) return null;
+    inkMis = { largo: w, corpo: F };
+    return inkMis;
   }
 
   function testoInk(){
@@ -482,6 +538,7 @@ function init(){
        la planata calcola una distanza di zero e non fa niente comunque. */
     document.documentElement.classList.add('is-consegna');
 
+    inkMis = null;
     vestiClone();
     cloneChars = spezza(testoInk());
     clone.classList.add('is-on');
@@ -512,21 +569,20 @@ function init(){
     var cs = getComputedStyle(titolo);
     var F  = parseFloat(cs.fontSize) || 1;
     var L  = parseFloat(cs.lineHeight) || F;
-    var Fi = titInk ? (parseFloat(getComputedStyle(titInk).fontSize) || F) : F;
 
     var perno = centroMaiuscole(F, L);          /* dal bordo alto della scatola */
-    var k     = Fi / F;                          /* quanto era piu' grande l'ink */
-    /* Il clone sta su una riga sola; il titolo dell'inchiostro, sotto i
-       1300px circa, va a capo. Piuttosto che riprodurre qui la sua
-       impaginazione — che e' scritta nello shader, non nel CSS — il clone si
-       ferma prima: non supera il 94% dello schermo, che e' la stessa soglia
-       a cui il motore manda a capo. Sopra i 1400px questo tetto non tocca
-       mai e la misura resta identica all'inchiostro. */
-    /* Il tetto si misura sulla scatola del CLONE, larga quanto il suo testo,
-       non su quella del titolo dello slider: sono due scritte diverse. */
-    var largo = clone.offsetWidth || B.width;
+
+    /* La scala e' il rapporto fra la larghezza RESA dall'inchiostro e quella
+       del clone, non fra due corpi dichiarati. Vedi misuraInk(). */
+    var largo = clone.offsetWidth || B.width || 1;
+    var mis   = misuraInk();
+    var k     = mis ? (mis.largo / largo) : 1;
+
+    /* Il tetto: lo shader manda a capo al 94% della larghezza, il clone sta
+       su una riga sola. Oltre quella soglia si ferma invece di uscire. */
     var tetto = (window.innerWidth * 0.94) / largo;
     if(k > tetto) k = tetto;
+    if(!(k > 0)) k = 1;
 
     var cx = B.left + B.width / 2;              /* dove arriva: centro del titolo */
     var cy = B.top + perno;                     /* ...e centro delle sue maiuscole */
@@ -767,17 +823,30 @@ function init(){
        vale come sempre. */
     if(primo){ primo = false; p = b; }
 
-    var tau = 0.02 + (1 - MORBIDEZZA) * 0.16;
+    /* Il peso serve MENTRE il viaggio e' in corso. Quando il bersaglio e'
+       a fondo corsa — la sezione si e' incollata, il titolo non ha piu'
+       dove andare — non serve piu' a niente e costa soltanto: dopo una
+       scrollata veloce il titolo continuava a scendere per quasi una
+       schermata dopo che la sezione era gia' ferma, e la coreografia
+       partiva con la tenuta quasi consumata. Misurato: 840 px di ritardo.
+       Agli estremi quindi si stringe. */
+    var tau = (b >= 1 || b <= 0) ? 0.05 : (0.02 + (1 - MORBIDEZZA) * 0.16);
+
+    /* E comunque non si resta indietro piu' di tanto. Senza un tetto, il
+       ritardo cresce con la velocita' dello scroll: a rotellata lanciata il
+       titolo si trovava mezzo viaggio dietro. E' lo stesso freno che
+       ink-transition.js mette al suo scrub, e per lo stesso motivo. */
+    if(b - p >  0.20) p = b - 0.20;
+    else if(b - p < -0.20) p = b + 0.20;
+
     p = p + (b - p) * (1 - Math.exp(-dt / tau));
 
     /* Un inseguimento esponenziale non arriva mai: ci si avvicina e basta.
-       Finche' il bersaglio si muove va benissimo — e' proprio il peso che si
-       vuole — ma quando si ferma a fondo corsa l'ultimo due per cento, che
-       l'occhio non vede, costava piu' di una schermata di scroll con il
-       titolo gia' fermo al suo posto e la sezione ancora vuota. Misurato:
-       1204 px di ritardo. Agli estremi, quindi, si CHIUDE. */
-    if(b >= 1 && p > 0.985) p = 1;
-    else if(b <= 0 && p < 0.015) p = 0;
+       L'ultimo due per cento non si vede — su un viaggio di ottocento pixel
+       sono sedici — ma se lo si aspetta costa mezzo secondo di sezione
+       ferma e vuota. Agli estremi si chiude. */
+    if(b >= 1 && p > 0.97) p = 1;
+    else if(b <= 0 && p < 0.03) p = 0;
     else if(Math.abs(b - p) < 0.0015) p = b;
 
     if(p > 0.0015) arma(); else if(p <= 0.0005) disarma();
@@ -835,8 +904,9 @@ function init(){
   window.addEventListener('resize', function(){
     clearTimeout(rT);
     rT = setTimeout(function(){
-      if(window.innerWidth < MIN_W) return;
+      if(window.innerWidth < MIN_W){ misura(); return; }
       met = metriche();
+      inkMis = null;
       misura();
       if(armato) piazza(CURVA ? morbida(p) : p);
     }, 160);
