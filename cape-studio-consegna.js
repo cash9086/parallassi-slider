@@ -115,6 +115,24 @@ var TESTO_COL  = [37, 42, 34];     /* #252a22, il colore del titolo a riposo*/
 var USCITA     = 0.45; /* secondi della dissolvenza in uscita, scrollando in
                           su.                                              */
 
+var USCITA_R   = 0.28; /* quanta TENUTA si tiene da parte per l'uscita, in
+                          frazione della riserva.
+
+                          Tornando indietro, viaggio e tenuta si susseguono
+                          senza sovrapporsi: finche' si consuma la riserva il
+                          progresso resta a 1 e non succede niente, e appena
+                          scende sotto 1 la sezione si stacca e comincia a
+                          scorrere giu'. Dissolvenza e scorrimento partivano
+                          cosi' nello stesso istante, e quello che si vedeva
+                          era una sezione che se ne va — non una che svanisce.
+
+                          Con questa fetta lo smontaggio comincia mentre la
+                          sezione e' ancora incollata, e quando si stacca la
+                          dissolvenza e' gia' finita. A 0.28 di due schermate
+                          sono quasi cinquecento pixel: alla velocita' di una
+                          rotellata normale, giusto i quattro decimi di
+                          secondo di USCITA.                                */
+
 var MIN_W      = 992;  /* sotto questa larghezza non si fa niente.          */
 
 /* ——— le due scelte di aspetto ————————————————————————————————————
@@ -432,6 +450,15 @@ function init(){
      quello che sopra puo' ancora cambiare altezza — un'immagine che arriva,
      un font che si sostituisce, l'inchiostro che rimisura. Un valore preso
      una volta sola diventerebbe sbagliato senza dare segno. */
+  /* Quanto della riserva e' stato consumato: 0 appena la sezione si
+     incolla, 1 quando sta per staccarsi di nuovo andando avanti. */
+  function inRiserva(){
+    if(!(sosta > 0)) return 1;
+    var y = window.scrollY || window.pageYOffset;
+    var naturale = pin.getBoundingClientRect().top + y;
+    return clamp01((y - (naturale - topIncollo)) / sosta);
+  }
+
   function bersaglio(){
     var y = window.scrollY || window.pageYOffset;
     /* dalla SCATOLA, che non si incolla mai: il suo bordo alto e' il bordo
@@ -444,6 +471,7 @@ function init(){
   /* ——— il viaggio ————————————————————————————————————————————————— */
   var p = 0, armato = false, montata = false, tlMontaggio = null;
   var cloneChars = [], vivo = false, girando = false, ultimo = 0, primo = true;
+  var assestata = false;
 
   function vestiClone(){
     var cs = getComputedStyle(titolo);
@@ -457,11 +485,17 @@ function init(){
        ogni fotogramma e la scatola deve seguirlo, se no il centro delle
        maiuscole si sposta mentre la scritta cresce */
     clone.style.lineHeight    = (L / F).toFixed(4);
-    clone.style.letterSpacing = cs.letterSpacing;
-    /* la spaziatura in em segue il corpo da sola; se e' in px va convertita,
-       se no a corpo grande le lettere si stringono */
-    if(/px$/.test(cs.letterSpacing)) clone.style.letterSpacing = (parseFloat(cs.letterSpacing) / F).toFixed(5) + 'em';
+    /* La spaziatura si tiene in multipli del corpo e si interpola lungo il
+       viaggio, perche' i due estremi non hanno la stessa: l'inchiostro
+       scrive a .02em, il titolo dello slider a -0.02em. Erano quattro
+       centesimi di em per lettera, e su quindici lettere fanno il 5% di
+       larghezza: siccome io accordavo le due scritte sulla LARGHEZZA
+       TOTALE, il clone compensava allargando il corpo. Stessa larghezza,
+       lettere piu' grosse — il 13% di inchiostro in piu', misurato. */
+    spazioTit = (cs.letterSpacing === 'normal' ? 0 : (parseFloat(cs.letterSpacing) || 0)) / F;
+    clone.style.letterSpacing = spazioTit.toFixed(5) + 'em';
     largoBase = 0;
+    capClone = 0;
   }
 
   /* Le lettere del clone, una <span> ciascuna: l'onda le accende una per una
@@ -496,7 +530,7 @@ function init(){
      E' il motivo per cui allo scambio le due scritte erano di grandezze
      visibilmente diverse. */
   var inkMis = null;
-  var largoBase = 0, corpoBase = 0;
+  var largoBase = 0, corpoBase = 0, spazioTit = 0;
 
   /* Quanto e' larga la scritta del clone a un corpo noto. Si misura una
      volta per corpo e non a ogni fotogramma: leggere offsetWidth subito dopo
@@ -505,6 +539,7 @@ function init(){
   function larghezzaBase(F){
     if(largoBase && corpoBase === F) return largoBase;
     clone.style.fontSize = F + 'px';
+    clone.style.letterSpacing = spazioTit.toFixed(5) + 'em';
     largoBase = clone.offsetWidth || 1;
     corpoBase = F;
     return largoBase;
@@ -525,8 +560,31 @@ function init(){
     for(i = 0; i < testo.length; i++) w += c.measureText(testo[i]).width + sp;
     if(testo.length) w -= sp;
     if(!(w > 0)) return null;
-    inkMis = { largo: w, corpo: F };
+    inkMis = {
+      largo: w,
+      corpo: F,
+      /* l'altezza delle maiuscole: e' QUESTA la misura che l'occhio legge
+         come "quanto e' grande la scritta", e l'unica indipendente dalla
+         spaziatura */
+      cap: c.measureText('H').actualBoundingBoxAscent || F * 0.7,
+      /* la spaziatura in multipli del corpo, per poterla prestare al clone */
+      spEm: sp / F
+    };
     return inkMis;
+  }
+
+  /* L'altezza delle maiuscole del CLONE, per unita' di corpo. Dipende solo
+     da famiglia e peso, quindi si misura una volta. */
+  var capClone = 0;
+  function capitaliClone(){
+    if(capClone) return capClone;
+    var c;
+    try{ c = document.createElement('canvas').getContext('2d'); }catch(e){ return 0.7; }
+    if(!c) return 0.7;
+    var cs = getComputedStyle(clone);
+    c.font = cs.fontStyle + ' ' + cs.fontWeight + ' 100px ' + cs.fontFamily;
+    capClone = (c.measureText('H').actualBoundingBoxAscent || 70) / 100;
+    return capClone;
   }
 
   function testoInk(){
@@ -670,16 +728,28 @@ function init(){
        scritta e' nitida a tutte e due le estremita'. Costa un ricalcolo di
        impaginazione per fotogramma, ma il clone e' fisso e fuori flusso:
        quel ricalcolo riguarda lui e basta, una riga di testo. */
+    /* ——— IL CORPO SI ACCORDA SULLE MAIUSCOLE, NON SULLA LARGHEZZA ————
+       Accordare le larghezze totali sembra la cosa ovvia e non lo e': le due
+       scritte hanno spaziature diverse, quindi per arrivare alla stessa
+       larghezza il clone allargava il corpo — stessa larghezza, lettere piu'
+       grosse. L'altezza delle maiuscole invece non dipende dalla spaziatura,
+       ed e' la misura che l'occhio legge come "quanto e' grande".
+
+       Poi la spaziatura si interpola anche lei, dall'una all'altra: cosi'
+       all'estremo dell'inchiostro il clone ha lo stesso corpo E lo stesso
+       tracciamento, e la larghezza torna a combaciare da sola. */
     var mis   = misuraInk();
-    var Fink  = mis ? (F * mis.largo / largo) : F;   /* il corpo a cui e' largo come l'inchiostro */
+    var capCl = capitaliClone();
+    var Fink  = (mis && capCl > 0) ? (mis.cap / capCl) : F;
 
     /* Lo shader manda a capo al 94% della larghezza; il clone sta su una
-       riga sola, quindi oltre quella soglia si ferma invece di uscire. */
-    var Ftetto = (window.innerWidth * 0.94) * F / largo;
-    if(Fink > Ftetto) Fink = Ftetto;
+       riga sola, quindi oltre quella soglia si rimpicciolisce. */
+    var tetto = window.innerWidth * 0.94;
+    if(mis && mis.largo > tetto) Fink *= tetto / mis.largo;
     if(!(Fink > 0)) Fink = F;
 
     var Fq     = F + (Fink - F) * u;                 /* il corpo adesso        */
+    var spQ    = spazioTit + ((mis ? mis.spEm : spazioTit) - spazioTit) * u;
     var perno  = centroMaiuscole(Fq, rapp * Fq);     /* il suo centro maiuscole*/
 
     /* Dove arriva: il punto in cui si poserebbe una scritta larga come la
@@ -704,6 +774,7 @@ function init(){
        3. l'ultima translate lo porta dove deve stare.
        Con l'origine a 0 0 non c'e' nessuna percentuale da interpretare. */
     if(Math.abs(parseFloat(clone.style.fontSize) - Fq) > 0.05) clone.style.fontSize = Fq.toFixed(2) + 'px';
+    if(Math.abs(parseFloat(clone.style.letterSpacing) / Fq - spQ) > 0.0005) clone.style.letterSpacing = spQ.toFixed(5) + 'em';
     clone.style.transform =
       'translate3d(' + cx.toFixed(2) + 'px,' + cy.toFixed(2) + 'px,0)' +
       ' translate(-50%,' + (-perno).toFixed(2) + 'px)';
@@ -849,6 +920,7 @@ function init(){
   function smonta(){
     if(!montata) return;
     montata = false;
+    assestata = false;
     if(tlMontaggio){ tlMontaggio.kill(); tlMontaggio = null; }
     /* Si torna al viaggio, quindi la planata torna ferma — l'aveva liberata
        la fine del montaggio. Senza questa riga, appena il fade e' finito
@@ -986,6 +1058,14 @@ function init(){
        ricominciato a scendere, non che la rotella ha tremato. */
     if(p >= 0.9995) monta(); else if(p <= 0.93) smonta();
 
+    /* E l'uscita anticipata, dentro la tenuta. La fetta si arma solo dopo
+       esserne usciti almeno una volta: il montaggio avviene a riserva zero,
+       quindi senza questa guardia lo smontaggio scatterebbe nell'istante
+       stesso in cui la sezione finisce di montarsi. */
+    var r = inRiserva();
+    if(r > USCITA_R + 0.12) assestata = true;
+    if(montata && assestata && r < USCITA_R) smonta();
+
     requestAnimationFrame(giro);
   }
 
@@ -1036,6 +1116,7 @@ function init(){
       met = metriche();
       inkMis = null;
       largoBase = 0;
+      capClone = 0;
       misura();
       if(armato) piazza(CURVA ? morbida(p) : p);
     }, 160);

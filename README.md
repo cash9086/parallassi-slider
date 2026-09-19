@@ -635,3 +635,47 @@ cioè di scatto e a dissolvenza già finita: il riquadro si spegneva di botto.
 Adesso torna subito ma trasparente e si riaccende con la stessa dissolvenza di
 tutto il resto — che su un fondo bianco è esattamente "le fotografie
 svaniscono". Misurato: nove valori intermedi di opacità invece di uno.
+
+
+### Il corpo si accorda sulle maiuscole, non sulla larghezza
+
+Accordare le due scritte sulla **larghezza totale** sembra la cosa ovvia e non
+lo è: hanno spaziature diverse — l'inchiostro scrive a `.02em`, il titolo dello
+slider a `-0.02em`. Sono quattro centesimi di em per lettera, e su quindici
+lettere fanno il 5% di larghezza; siccome accordavo le larghezze, il clone
+compensava **allargando il corpo**. Stessa larghezza, lettere più grosse.
+
+Misurato sui due screenshot: larghezza 1622 contro 1626 px — uguali — ma
+**+13% di pixel scuri**.
+
+L'altezza delle maiuscole invece non dipende dalla spaziatura, ed è la misura
+che l'occhio legge come "quanto è grande". Adesso il corpo si accorda su
+quella, e la spaziatura si **interpola** anche lei dall'una all'altra lungo il
+viaggio: all'estremo dell'inchiostro il clone ha lo stesso corpo *e* lo stesso
+tracciamento, e la larghezza torna a combaciare da sola.
+
+Verificato confrontando due screenshot — il clone da una parte, il disegno
+dello shader dall'altra — e contando i pixel:
+
+| | prima | adesso |
+|---|---|---|
+| larghezza | uguale | +8 px su 1387 |
+| altezza | — | **0 px** |
+| pixel scuri | **+13%** | **+0,7%** |
+
+### L'uscita comincia mentre la sezione è ancora ferma
+
+Tornando indietro, viaggio e tenuta si susseguono senza sovrapporsi: finché si
+consuma la riserva il progresso resta a 1 e non succede niente, e appena scende
+sotto 1 la sezione si stacca e comincia a scorrere giù. Dissolvenza e
+scorrimento partivano così nello stesso istante, e quello che si vedeva era una
+sezione che se ne va — non una che svanisce.
+
+`USCITA_R` (0.28) tiene da parte una fetta della riserva per l'uscita: lo
+smontaggio comincia mentre la sezione è ancora incollata, e quando si stacca la
+dissolvenza è già finita. La fetta si arma solo dopo esserne usciti almeno una
+volta — il montaggio avviene a riserva zero, quindi senza quella guardia lo
+smontaggio scatterebbe nell'istante stesso del montaggio.
+
+Misurato risalendo: la sezione resta a `top −60` per tutta la dissolvenza, che
+finisce a y 5673; comincia a muoversi a y 5618.
