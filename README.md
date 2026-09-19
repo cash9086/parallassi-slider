@@ -595,3 +595,43 @@ Adesso il clone si accende appena l'inchiostro è a fondo corsa (progresso 0.995
 misurato: dodici pixel prima che si sfili), al centro dello schermo, esattamente
 sopra le lettere che il fluido sta ancora dipingendo. Verificato: centro a 959
 su 959, centro delle maiuscole a 436 su 438, e fermo lì per tutta la dissolvenza.
+
+
+### Il corpo si anima, non si scala
+
+Una scala CSS su del testo lo fa rasterizzare alla misura di **impaginazione**
+e poi ingrandire come un'immagine. Il clone viaggiava con `scale(1.65)`: alla
+fine del viaggio la mega scritta era una bitmap da novanta pixel tirata al
+165%, sgranata e visibilmente diversa da quella che l'inchiostro dipinge.
+
+Era insieme il "problema di risoluzione" riscrollando in su e metà del
+distacco allo scambio. Adesso a cambiare è il `font-size`: il browser
+ridisegna i glifi a ogni misura e la scritta è nitida a tutte e due le
+estremità. Costa un ricalcolo di impaginazione per fotogramma, ma il clone è
+fisso e fuori flusso — quel ricalcolo riguarda lui e basta, una riga di testo.
+
+Perché funzioni, due dettagli: l'interlinea del clone è un **rapporto** e non
+un valore in pixel (se no il centro delle maiuscole si sposta mentre la
+scritta cresce), e una spaziatura in px viene convertita in `em` (se no a
+corpo grande le lettere si stringono).
+
+Misurato allo scambio: inchiostro 1392 px, clone 1391, scala nella
+trasformazione = 1. All'arrivo: corpo del clone 49.6 px, corpo del titolo
+49.6 px.
+
+### Lo scambio è istantaneo
+
+`SCAMBIO` è a zero, e adesso è la scelta giusta. Una dissolvenza lì non serve
+— le due scritte sono nello stesso punto e della stessa misura al pixel — e fa
+danno: dura più dei pochi pixel in cui l'inchiostro è ancora incollato, quindi
+per il resto della sua durata la scritta vecchia scivola via mentre la nuova
+sta ferma. Uno scambio in un fotogramma non ha nessuna finestra in cui le due
+possano separarsi.
+
+### In uscita le fotografie svaniscono
+
+Il velo bianco tornava al suo posto con un `display:block` dentro `riposa()`,
+cioè di scatto e a dissolvenza già finita: il riquadro si spegneva di botto.
+Adesso torna subito ma trasparente e si riaccende con la stessa dissolvenza di
+tutto il resto — che su un fondo bianco è esattamente "le fotografie
+svaniscono". Misurato: nove valori intermedi di opacità invece di uno.

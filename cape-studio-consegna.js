@@ -89,9 +89,18 @@ var MORBIDEZZA = 0.14; /* 0..1 — quanto il viaggio insegue lo scroll invece
 var CURVA      = true; /* smussa partenza e arrivo del viaggio (smoothstep).
                           false = il titolo parte e si ferma di colpo.      */
 
-var SCAMBIO    = 0.12; /* secondi della dissolvenza con cui il clone prende
-                          il posto del buco nell'inchiostro. Sotto i 0.10 lo
-                          scambio comincia a vedersi come uno stacco.       */
+var SCAMBIO    = 0;    /* secondi della dissolvenza con cui il clone prende
+                          il posto del buco nell'inchiostro. ZERO, ed e' la
+                          scelta giusta adesso che le due scritte sono nello
+                          stesso punto e della stessa misura al pixel.
+
+                          Una dissolvenza qui non serve a niente e fa danno:
+                          dura piu' dei pochi pixel in cui l'inchiostro e'
+                          ancora incollato, quindi per tutto il resto della
+                          sua durata la scritta vecchia scivola via mentre la
+                          nuova sta ferma. E' il distacco che si vedeva. Uno
+                          scambio in un fotogramma non ha nessuna finestra in
+                          cui le due possano separarsi.                     */
 
 var LUCE_DUR   = 0.95; /* secondi dell'onda di luce sul titolo.             */
 
@@ -438,12 +447,21 @@ function init(){
 
   function vestiClone(){
     var cs = getComputedStyle(titolo);
+    var F = parseFloat(cs.fontSize) || 1;
+    var L = parseFloat(cs.lineHeight) || F;
     clone.style.fontFamily    = cs.fontFamily;
     clone.style.fontWeight    = cs.fontWeight;
     clone.style.fontStyle     = cs.fontStyle;
-    clone.style.fontSize      = cs.fontSize;
-    clone.style.lineHeight    = cs.lineHeight;
+    clone.style.fontSize      = F + 'px';
+    /* interlinea come RAPPORTO, non in pixel: il corpo del clone cambia a
+       ogni fotogramma e la scatola deve seguirlo, se no il centro delle
+       maiuscole si sposta mentre la scritta cresce */
+    clone.style.lineHeight    = (L / F).toFixed(4);
     clone.style.letterSpacing = cs.letterSpacing;
+    /* la spaziatura in em segue il corpo da sola; se e' in px va convertita,
+       se no a corpo grande le lettere si stringono */
+    if(/px$/.test(cs.letterSpacing)) clone.style.letterSpacing = (parseFloat(cs.letterSpacing) / F).toFixed(5) + 'em';
+    largoBase = 0;
   }
 
   /* Le lettere del clone, una <span> ciascuna: l'onda le accende una per una
@@ -478,6 +496,19 @@ function init(){
      E' il motivo per cui allo scambio le due scritte erano di grandezze
      visibilmente diverse. */
   var inkMis = null;
+  var largoBase = 0, corpoBase = 0;
+
+  /* Quanto e' larga la scritta del clone a un corpo noto. Si misura una
+     volta per corpo e non a ogni fotogramma: leggere offsetWidth subito dopo
+     aver scritto il font-size costringe il browser a rifare l'impaginazione
+     li' sul posto, e farlo sessanta volte al secondo si sente. */
+  function larghezzaBase(F){
+    if(largoBase && corpoBase === F) return largoBase;
+    clone.style.fontSize = F + 'px';
+    largoBase = clone.offsetWidth || 1;
+    corpoBase = F;
+    return largoBase;
+  }
 
   function misuraInk(){
     if(inkMis) return inkMis;
@@ -555,7 +586,7 @@ function init(){
   function inkAFondo(){
     var s = window.inkSection;
     if(!s || typeof s.progress !== 'number' || !s.ready) return false;
-    return s.progress >= 0.995;
+    return s.progress >= 0.99;
   }
 
   function disarma(){
@@ -623,28 +654,41 @@ function init(){
     var F  = parseFloat(cs.fontSize) || 1;
     var L  = parseFloat(cs.lineHeight) || F;
 
-    var perno = centroMaiuscole(F, L);          /* dal bordo alto della scatola */
+    var rapp  = L / F;                          /* interlinea, in multipli del corpo */
+    var largo = larghezzaBase(F);               /* la scritta al corpo del titolo   */
+    var u     = 1 - q;
 
-    /* La scala e' il rapporto fra la larghezza RESA dall'inchiostro e quella
-       del clone, non fra due corpi dichiarati. Vedi misuraInk(). */
-    var largo = clone.offsetWidth || B.width || 1;
+    /* ——— IL CORPO SI ANIMA, NON SI SCALA ————————————————————————————
+       Una scala CSS su del testo lo fa rasterizzare alla misura di
+       IMPAGINAZIONE e poi ingrandire come un'immagine. Alla fine del
+       viaggio la mega scritta era una bitmap da novanta pixel tirata al
+       165%: sgranata, e diversa da quella che l'inchiostro dipinge — e'
+       insieme il "problema di risoluzione" quando si riscrolla in su e
+       meta' del distacco che si vede allo scambio.
+
+       Cambiando il CORPO, il browser ridisegna i glifi a ogni misura e la
+       scritta e' nitida a tutte e due le estremita'. Costa un ricalcolo di
+       impaginazione per fotogramma, ma il clone e' fisso e fuori flusso:
+       quel ricalcolo riguarda lui e basta, una riga di testo. */
     var mis   = misuraInk();
-    var k     = mis ? (mis.largo / largo) : 1;
+    var Fink  = mis ? (F * mis.largo / largo) : F;   /* il corpo a cui e' largo come l'inchiostro */
 
-    /* Il tetto: lo shader manda a capo al 94% della larghezza, il clone sta
-       su una riga sola. Oltre quella soglia si ferma invece di uscire. */
-    var tetto = (window.innerWidth * 0.94) / largo;
-    if(k > tetto) k = tetto;
-    if(!(k > 0)) k = 1;
+    /* Lo shader manda a capo al 94% della larghezza; il clone sta su una
+       riga sola, quindi oltre quella soglia si ferma invece di uscire. */
+    var Ftetto = (window.innerWidth * 0.94) * F / largo;
+    if(Fink > Ftetto) Fink = Ftetto;
+    if(!(Fink > 0)) Fink = F;
+
+    var Fq     = F + (Fink - F) * u;                 /* il corpo adesso        */
+    var perno  = centroMaiuscole(Fq, rapp * Fq);     /* il suo centro maiuscole*/
 
     /* Dove arriva: il punto in cui si poserebbe una scritta larga come la
        nostra, allineata come sono allineate le altre. */
     var anc = ancora();
-    var cx = B.left + anc * B.width + (0.5 - anc) * largo;
-    var cy = B.top + perno;                     /* centro delle sue maiuscole */
-    var dx = window.innerWidth / 2  - cx;       /* da dove parte: centro schermo   */
-    var dy = window.innerHeight / 2 - cy;
-    var u  = 1 - q;
+    var cx0 = B.left + anc * B.width + (0.5 - anc) * largo;
+    var cy0 = B.top + centroMaiuscole(F, L);
+    var cx  = cx0 + (window.innerWidth / 2  - cx0) * u;
+    var cy  = cy0 + (window.innerHeight / 2 - cy0) * u;
 
     /* Le lettere dell'inchiostro sono #141416 — e' il colore della slide che
        si vede attraverso, non una scelta — e il titolo del carosello
@@ -659,9 +703,9 @@ function init(){
        2. scale ingrandisce attorno a quel punto, che quindi non si sposta;
        3. l'ultima translate lo porta dove deve stare.
        Con l'origine a 0 0 non c'e' nessuna percentuale da interpretare. */
+    if(Math.abs(parseFloat(clone.style.fontSize) - Fq) > 0.05) clone.style.fontSize = Fq.toFixed(2) + 'px';
     clone.style.transform =
-      'translate3d(' + (cx + dx * u).toFixed(2) + 'px,' + (cy + dy * u).toFixed(2) + 'px,0)' +
-      ' scale(' + (1 + (k - 1) * u).toFixed(4) + ')' +
+      'translate3d(' + cx.toFixed(2) + 'px,' + cy.toFixed(2) + 'px,0)' +
       ' translate(-50%,' + (-perno).toFixed(2) + 'px)';
   }
 
@@ -785,6 +829,7 @@ function init(){
     if(cloneChars.length && nuove.length) tlMontaggio.add(onda(cloneChars, nuove), 0);
     tlMontaggio.add(studio.entrataRighe(), 0);
     if(pagerLn) tlMontaggio.add(studio.tendina([pagerLn]), 0);
+    gsap.set(coperta, { clearProps: 'opacity' });
     tlMontaggio.add(studio.sfoglia(coperta, -1), 0);
     if(edge) tlMontaggio.fromTo(edge, { opacity: 0 }, { opacity: 1, duration: 0.6, ease: 'power2.out' }, 0.35);
 
@@ -827,6 +872,18 @@ function init(){
       gsap.to(nuove, { opacity: 0, duration: USCITA * 0.6, ease: 'power2.out' });
     }
 
+    /* Le fotografie devono SVANIRE, non sparire. Prima il velo bianco
+       tornava al suo posto con un display:block in riposa(), cioe' di
+       scatto e a dissolvenza gia' finita: il riquadro si spegneva di
+       botto. Adesso torna subito ma trasparente, e si riaccende con la
+       stessa dissolvenza di tutto il resto — che su un fondo bianco e'
+       esattamente "le fotografie svaniscono". */
+    gsap.killTweensOf(coperta);
+    coperta.classList.remove('is-via');
+    coperta.style.transform = '';
+    gsap.fromTo(coperta, { opacity: 0 },
+      { opacity: 1, duration: USCITA, ease: 'power2.out' });
+
     /* Il titolo dell'inchiostro deve tornare leggibile per rifare il
        viaggio al contrario, ma non puo' ricomparire di scatto mentre quello
        dell'opera sta ancora svanendo: per un terzo di secondo si vedrebbero
@@ -855,6 +912,7 @@ function init(){
     sez.classList.add('cnsg-attesa');
     coperta.classList.remove('is-via');
     coperta.style.transform = '';
+    gsap.set(coperta, { clearProps: 'opacity' });
     var spenti = [info, pager].filter(Boolean);
     if(spenti.length) gsap.set(spenti, { clearProps: 'opacity' });
     if(edge) gsap.set(edge, { clearProps: 'opacity' });
@@ -977,6 +1035,7 @@ function init(){
       if(window.innerWidth < MIN_W){ misura(); return; }
       met = metriche();
       inkMis = null;
+      largoBase = 0;
       misura();
       if(armato) piazza(CURVA ? morbida(p) : p);
     }, 160);
