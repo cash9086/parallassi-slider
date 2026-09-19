@@ -99,6 +99,26 @@ var USCITA     = 0.45; /* secondi della dissolvenza in uscita, scrollando in
 
 var MIN_W      = 992;  /* sotto questa larghezza non si fa niente.          */
 
+/* ——— le due scelte di aspetto ————————————————————————————————————
+   Non sono plumbing, sono decisioni, e stanno qui dove si vedono.
+
+   CARATTERE: il titolo dell'inchiostro e quello dello slider erano due
+   caratteri diversi. Siccome adesso la stessa scritta passa dall'uno
+   all'altro senza mai sparire, un cambio a meta' strada si leggerebbe come
+   un errore. Il nome e' quello con cui Webflow ha registrato il font, hash
+   compreso: all'upload se lo ricava dal nome del file. Sembra un refuso e
+   non lo e' — scritto "PP Editorial New" il titolo resta senza font. E' la
+   stessa riga che sta in cape-title-ink.js.
+   A stringa vuota, il titolo dello slider resta con il suo carattere.
+
+   FONDO: il motore dell'inchiostro dipinge #ffffff pieno. Con il #fbfaf7
+   della sezione, sul raccordo si vedrebbe un gradino di colore proprio
+   mentre il titolo ci passa sopra. */
+var FONT_TITOLO = '"Ppeditorialnew Bf 644 B 21500 D 0 C 0", Georgia, serif';
+var PESO_TITOLO = '200';
+var SPAZ_TITOLO = '.02em';
+var FONDO_SEZ   = '#ffffff';
+
 /* ── da qui in giu' non ci sono numeri da girare ───────────────────────── */
 
 var SEZ     = '.studio-hero';
@@ -114,6 +134,101 @@ var TIT_INK = '.ink-title';
 
 function clamp01(v){ return v < 0 ? 0 : (v > 1 ? 1 : v); }
 function morbida(t){ return t * t * (3 - 2 * t); }
+
+/* ── il vestito ───────────────────────────────────────────────────────────
+   Sta qui e non nel custom code della pagina, per due motivi.
+
+   Il primo: il campo "Inside head tag" della Home e' gia' lungo quindicimila
+   caratteri. Aggiungerci un blocco da novemila vuol dire mettersi in mano a
+   un limite che non si vede finche' non taglia — e un <style> tagliato a
+   meta' non da' errore, si porta via in silenzio tutto quello che viene
+   dopo.
+
+   Il secondo: queste regole sono la meta' di un meccanismo la cui altra
+   meta' e' in questo file. Tenerle in due posti diversi, uno dei quali si
+   aggiorna cambiando uno SHA e l'altro incollando a mano, e' garantirsi che
+   prima o poi non combacino piu'.
+
+   Niente !important: se un domani vuoi sovrascrivere qualcosa dal Designer o
+   dal custom code, deve bastarti farlo. */
+function vesti(){
+  if(document.getElementById('cape-consegna-css')) return;
+  var st = document.createElement('style');
+  st.id = 'cape-consegna-css';
+  st.textContent = [
+    /* La sezione si incolla al centro. Il --cnsg-top lo scrive il JS
+       misurando l'altezza vera. */
+    '.cnsg-sez{position:sticky;top:var(--cnsg-top,0px)' +
+      (FONDO_SEZ ? ';background:' + FONDO_SEZ : '') + '}',
+
+    /* Il titolo dello slider prende il carattere dell'inchiostro. Spaziatura
+       e peso sono quelli dell'inchiostro, non quelli che aveva il Bodoni:
+       -0.035em era una crenatura giusta per un carattere con le grazie
+       piene, su un ultralight stringe le lettere fino a farle toccare. */
+    (FONT_TITOLO ? '.cnsg-sez .studio-headline__row{font-family:' + FONT_TITOLO +
+      ';font-weight:' + PESO_TITOLO + ';letter-spacing:' + SPAZ_TITOLO + '}' : ''),
+
+    /* La riserva: lo scroll in cui, a titolo arrivato, la sezione sta ferma
+       mentre le animazioni girano. Bianca come la sezione sopra: qualunque
+       altro colore si vedrebbe come una striscia su uno schermo alto. */
+    '.cnsg-riserva{position:relative;width:100%;background:#ffffff;pointer-events:none}',
+
+    /* Il velo sul canvas dell'inchiostro. Serve a coprire le LETTERE, non il
+       bianco: il bianco sotto c'e' gia', ed e' per questo che accendersi non
+       si vede. z-index 2 perche' .ink-title sta a 1. */
+    '.cnsg-velo{position:absolute;inset:0;z-index:2;background:#ffffff;opacity:0;',
+      'pointer-events:none;transition:opacity .18s linear}',
+    '.cnsg-velo.is-on{opacity:1}',
+
+    /* Il clone che viaggia. z-index 7 come .ink-pin, e viene dopo nel
+       documento: a parita' di z-index vince chi sta piu' in basso nel
+       codice, quindi sta sopra l'inchiostro senza dover alzare il numero e
+       finire davanti a qualcos'altro. */
+    '.cnsg-titolo{position:fixed;z-index:7;margin:0;white-space:nowrap;text-align:center;',
+      'pointer-events:none;opacity:0;transition:opacity .18s linear;will-change:transform}',
+    '.cnsg-titolo.is-on{opacity:1}',
+    '.cnsg-titolo .cnsg-char{display:inline-block}',
+    '.cnsg-titolo .cnsg-spazio{display:inline-block;white-space:pre}',
+
+    /* Il velo bianco sopra le fotografie. z-index 4: sopra la cornice (3),
+       che altrimenti tradirebbe con un filo di bordo dove sta il riquadro
+       prima che si apra. */
+    '.cnsg-coperta{position:absolute;inset:0;z-index:4;background:#ffffff;',
+      'pointer-events:none;will-change:transform}',
+    '.cnsg-coperta.is-via{display:none}',
+
+    /* La barra sale da dietro il proprio bordo. La finestra non puo' stare
+       sulla barra: quella e' anche la riga flex che allinea frecce e
+       binario. Il gap lo riscrive il JS. */
+    '.cnsg-pager-win{display:block;width:100%;clip-path:inset(-0.15em -100% -0.02em -100%)}',
+    '.cnsg-pager-ln{display:flex;width:100%;align-items:center;justify-content:center}',
+
+    /* Lo stato di attesa. Le fotografie non sono qui: quelle non sono
+       nascoste, sono sotto il velo — ed e' per questo che quando il velo se
+       ne va sembra che si apra un buco.
+
+       opacity e non visibility: il cursore su misura decide il proprio stato
+       leggendo l'opacita' calcolata di quello che ha sotto, quindi con
+       opacity 0 si spegne da solo. E le misure restano: il carosello
+       impagina il titolo misurandolo, e un elemento senza misura gli
+       farebbe sbagliare il corpo. */
+    '.cnsg-attesa .studio-headline,.cnsg-attesa .studio-info,',
+      '.cnsg-attesa .studio-pager{opacity:0;pointer-events:none}',
+    '.cnsg-attesa .studio-stage__edge{opacity:0}',
+
+    /* Sotto i 992px il ponte e' gia' spento e l'inchiostro ripiega da solo:
+       qui non c'e' niente da consegnare. Il JS esce prima di toccare
+       qualsiasi cosa; questa e' la rete per chi restringe la finestra a
+       sezione gia' montata. */
+    '@media (max-width:991px),(prefers-reduced-motion:reduce){',
+      '.cnsg-sez{position:relative;top:auto}',
+      '.cnsg-riserva,.cnsg-velo,.cnsg-titolo,.cnsg-coperta{display:none}',
+      '.cnsg-attesa .studio-headline,.cnsg-attesa .studio-info,',
+      '.cnsg-attesa .studio-pager,.cnsg-attesa .studio-stage__edge{',
+      'opacity:1;pointer-events:auto}}'
+  ].join('');
+  document.head.appendChild(st);
+}
 
 function init(){
   if(window.innerWidth < MIN_W) return;
@@ -133,8 +248,10 @@ function init(){
 
   if(!sez || !titolo || !guscio || !stage) return;
 
-  var studio = window.CapeStudio;
-  studio.hold();
+  vesti();
+
+  var studio = window.capeStudio;
+  studio.sospendi();
 
   /* ——— il rig ————————————————————————————————————————————————————
      La sezione si incolla al centro dello schermo e dietro di lei si apre la
@@ -191,6 +308,14 @@ function init(){
     win.appendChild(ln);
     pager.appendChild(win);
     pagerLn = ln;
+
+    /* Il gap non si eredita: non e' una proprieta' ereditabile, e un
+       gap:inherit sull'involucro prenderebbe quello del padre — che adesso
+       e' l'involucro stesso, che di gap non ne ha. Misurato: 21.3px -> 0,
+       frecce e binario attaccati. Quindi si legge e si riscrive. */
+    var gp = getComputedStyle(pager);
+    var g = gp.columnGap && gp.columnGap !== 'normal' ? gp.columnGap : gp.gap;
+    if(g && g !== 'normal') ln.style.gap = g;
   }
 
   /* ——— le metriche del carattere ——————————————————————————————————
@@ -303,6 +428,11 @@ function init(){
        Senza inchiostro in pagina non c'e' niente da aspettare. */
     var ink = window.inkSection;
     if(ink && typeof ink.progress === 'number' && ink.ready && ink.progress < 0.92) return;
+
+    /* Se il blocco di testo e' in prestito al reel, non e' roba nostra: la
+       sezione ha due consegne, e quella che porta il blocco giu' ha la
+       precedenza perche' e' gia' cominciata. */
+    if(studio.inPrestito && studio.inPrestito()) return;
 
     armato = true;
 
@@ -483,7 +613,7 @@ function init(){
     if(montata) return;
     montata = true;
 
-    var nuove = studio.chars;
+    var nuove = studio.lettere();
     if(nuove.length) gsap.set(nuove, { opacity: 0 });
 
     /* La timeline si costruisce PRIMA di scoprire la sezione, e in pausa.
@@ -496,7 +626,7 @@ function init(){
     tlMontaggio = gsap.timeline({ paused: true, onComplete: montato });
 
     if(cloneChars.length && nuove.length) tlMontaggio.add(onda(cloneChars, nuove), 0);
-    tlMontaggio.add(studio.entrata(), 0);
+    tlMontaggio.add(studio.entrataRighe(), 0);
     if(pagerLn) tlMontaggio.add(studio.tendina([pagerLn]), 0);
     tlMontaggio.add(studio.sfoglia(coperta, -1), 0);
     if(edge) tlMontaggio.fromTo(edge, { opacity: 0 }, { opacity: 1, duration: 0.6, ease: 'power2.out' }, 0.35);
@@ -508,7 +638,7 @@ function init(){
   function montato(){
     document.documentElement.classList.remove('is-consegna');
     coperta.classList.add('is-via');
-    studio.release();
+    studio.riprendi();
   }
 
   /* Scrollando in su: svanisce quello che era comparso, il titolo riprende il
@@ -524,9 +654,9 @@ function init(){
        in su che l'utente ha appena fatto. Si libera di nuovo in disarma(),
        quando il titolo e' tornato all'inchiostro. */
     document.documentElement.classList.add('is-consegna');
-    studio.hold();
+    studio.sospendi();
 
-    var nuove = studio.chars;
+    var nuove = studio.lettere();
     var roba = [info, pager, edge].filter(Boolean);
 
     if(roba.length){
@@ -571,7 +701,7 @@ function init(){
     var spenti = [info, pager].filter(Boolean);
     if(spenti.length) gsap.set(spenti, { clearProps: 'opacity' });
     if(edge) gsap.set(edge, { clearProps: 'opacity' });
-    var nuove = studio.chars, i;
+    var nuove = studio.lettere(), i;
     for(i = 0; i < nuove.length; i++) spegni(nuove[i]);
     if(nuove.length) gsap.set(nuove, { clearProps: 'opacity' });
   }
@@ -591,9 +721,19 @@ function init(){
        posto senza aver scrollato di un pixel. Da li' in poi lo smorzamento
        vale come sempre. */
     if(primo){ primo = false; p = b; }
-    var tau = 0.02 + (1 - MORBIDEZZA) * 0.33;
+
+    var tau = 0.02 + (1 - MORBIDEZZA) * 0.16;
     p = p + (b - p) * (1 - Math.exp(-dt / tau));
-    if(Math.abs(b - p) < 0.0015) p = b;
+
+    /* Un inseguimento esponenziale non arriva mai: ci si avvicina e basta.
+       Finche' il bersaglio si muove va benissimo — e' proprio il peso che si
+       vuole — ma quando si ferma a fondo corsa l'ultimo due per cento, che
+       l'occhio non vede, costava piu' di una schermata di scroll con il
+       titolo gia' fermo al suo posto e la sezione ancora vuota. Misurato:
+       1204 px di ritardo. Agli estremi, quindi, si CHIUDE. */
+    if(b >= 1 && p > 0.985) p = 1;
+    else if(b <= 0 && p < 0.015) p = 0;
+    else if(Math.abs(b - p) < 0.0015) p = b;
 
     if(p > 0.0015) arma(); else if(p <= 0.0005) disarma();
 
@@ -645,7 +785,7 @@ function init(){
    e mezz'ora buttata a cercarlo altrove. Meglio aspettarlo qualche istante e
    dirlo chiaro se non arriva. */
 function avvia(tentativi){
-  if(window.CapeStudio){ init(); return; }
+  if(window.capeStudio){ init(); return; }
   if(tentativi > 40){
     console.warn('[consegna] cape-studio-carousel.js non ha esposto i suoi gesti: la sezione resta com\'era.');
     return;

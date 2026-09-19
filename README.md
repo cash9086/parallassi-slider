@@ -14,7 +14,7 @@ custom code della pagina, perché là lo spazio è finito.
 jQuery. `camera-oscura.js` vuole GSAP e ScrollTrigger già caricati.
 `cape-studio-consegna.js` vuole GSAP (solo il core) e, unico in questa repo,
 **non è indipendente**: chiama i gesti che `cape-studio-carousel.js` espone su
-`window.CapeStudio`, e va caricato dopo di lui. Se non lo trova aspetta due
+`window.capeStudio`, e va caricato dopo di lui. Se non lo trova aspetta due
 secondi e poi lo dice in console invece di restare zitto. Legge anche, se c'è,
 la mappa di arrivo dell'inchiostro su `window.inkSection`: se non c'è, ripiega
 e funziona lo stesso.
@@ -418,8 +418,16 @@ Tutte in cima al file. Le due che contano sono le stesse due di
 | `MIN_W` | `992` | sotto questa larghezza non fa niente |
 
 I tempi delle tendine e della scivolata **non sono qui**: li chiede al
-carosello. Se un domani cambia la durata della tendina nel suo blocco
-`IMPOSTAZIONI`, cambia anche qui, da sola.
+carosello (`capeStudio.tendina`, `entrataRighe`, `sfoglia`). Se un domani
+cambia la durata della tendina nel suo blocco `IMPOSTAZIONI`, cambia anche
+qui, da sola.
+
+**Il CSS sta dentro questo file**, non nel custom code della pagina: il campo
+*Inside head tag* della Home è già lungo quindicimila caratteri, e un `<style>`
+troncato non dà errore — si porta via in silenzio tutto quello che viene dopo.
+E queste regole sono metà di un meccanismo la cui altra metà è qui: tenerle in
+due posti, uno che si aggiorna cambiando uno SHA e l'altro incollando a mano, è
+garantirsi che prima o poi non combacino più.
 
 ### Cosa si aggiunge alla pagina
 
@@ -457,3 +465,18 @@ Lo stile di tutti e quattro sta nel custom code della head della Home, blocco
   siede basso. Se le due cose non combaciassero, allo scambio la scritta
   salterebbe — di pochi pixel, ma nell'unico fotogramma in cui la si sta
   guardando.
+
+
+### Cosa è costato impararlo
+
+Due cose misurate sul banco di prova, e vale la pena che restino scritte.
+
+**Lo smorzamento non arriva mai.** Un inseguimento esponenziale si avvicina al
+bersaglio e basta: finché il bersaglio si muove è proprio il peso che si vuole,
+ma quando si ferma a fondo corsa l'ultimo due per cento — che l'occhio non vede
+— costava **1204 px di scroll** con il titolo già fermo al suo posto e la
+sezione ancora vuota. Adesso agli estremi si chiude: `1204 px → 289 px`.
+
+**Il `gap` non si eredita.** `gap: inherit` sull'involucro della barra prendeva
+quello del padre, che è l'involucro stesso, che di gap non ne ha: `21.3px → 0`,
+frecce e binario attaccati. Si legge dal pager e si riscrive.
