@@ -480,3 +480,30 @@ sezione ancora vuota. Adesso agli estremi si chiude: `1204 px → 289 px`.
 **Il `gap` non si eredita.** `gap: inherit` sull'involucro della barra prendeva
 quello del padre, che è l'involucro stesso, che di gap non ne ha: `21.3px → 0`,
 frecce e binario attaccati. Si legge dal pager e si riscrive.
+
+
+### Quello che il video ha fatto vedere, e il banco ha misurato
+
+**Il testo non si centra quando sborda.** Il clone aveva una larghezza imposta
+e `text-align:center`. Quando il testo è più largo della scatola, il browser
+non lo centra: lo allinea al bordo di partenza e lo fa sbordare tutto
+dall'altra parte. Misurato: **217 px fuori centro**, che moltiplicati per la
+scala 1,65 del viaggio diventano **358 px**. La scritta compariva spostata di
+mezzo schermo rispetto al buco nell'inchiostro, e per un istante se ne
+vedevano due. Adesso la scatola si stringe sul testo e tutto passa dalla
+trasformazione: **scarto 0**, verificato sovrapponendo un riferimento disegnato
+con lo stesso identico conto dello shader.
+
+**La sezione è più alta della finestra.** `.studio-hero` è alta 52vw: dentro
+una finestra di browser vera — 1918 × 870 — sono 997 px in 870. Con il
+centraggio bloccato a zero la sezione si incollava in cima e quei 127 px
+uscivano tutti dal fondo: la barra del carosello finiva a `top: 898`, sotto il
+bordo, e il titolo a `-17`, sopra. **La sezione sembrava vuota mentre era
+intera, solo fuori dallo schermo.** Il centraggio adesso può essere negativo.
+
+**La riserva era troppo corta.** Il montaggio dura quasi due secondi e una
+schermata di riserva si consuma in poco più di uno: la sezione se ne andava a
+metà coreografia, con le fotografie ancora sotto il velo. `SOSTA_VH` da 1.00 a
+1.60, e un secondo osservatore che, se la sezione esce davvero dallo schermo a
+coreografia in corso, la porta a fondo corsa — così tornando indietro la si
+trova montata e non a metà.

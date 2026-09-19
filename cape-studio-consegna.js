@@ -65,11 +65,17 @@ var VIAGGIO_VH = 1.00; /* schermate di scroll in cui il titolo viaggia dal
                           titolo resta fermo al centro piu' a lungo e poi
                           scatta giu' in fretta.                            */
 
-var SOSTA_VH   = 1.00; /* LA TENUTA — schermate di scroll in cui, a titolo
+var SOSTA_VH   = 1.60; /* LA TENUTA — schermate di scroll in cui, a titolo
                           arrivato, la sezione sta ferma incollata mentre le
                           animazioni girano. E' l'unico scroll che questa
-                          coreografia AGGIUNGE alla pagina. A 0 la sezione
-                          scorre via mentre si sta ancora montando.         */
+                          coreografia AGGIUNGE alla pagina.
+
+                          Era 1.00 e non bastava: il montaggio dura quasi due
+                          secondi — onda, tendine, scivolata del velo — e una
+                          schermata di riserva si consuma in poco piu' di uno.
+                          La sezione se ne andava a meta' coreografia, con le
+                          fotografie ancora sotto il velo. Se la accorci,
+                          accorcia anche LUCE_DUR.                          */
 
 var MORBIDEZZA = 0.14; /* 0..1 — quanto il viaggio insegue lo scroll invece
                           di esserci incollato. E' lo stesso inseguimento
@@ -184,8 +190,21 @@ function vesti(){
        documento: a parita' di z-index vince chi sta piu' in basso nel
        codice, quindi sta sopra l'inchiostro senza dover alzare il numero e
        finire davanti a qualcos'altro. */
-    '.cnsg-titolo{position:fixed;z-index:7;margin:0;white-space:nowrap;text-align:center;',
-      'pointer-events:none;opacity:0;transition:opacity .18s linear;will-change:transform}',
+    /* left/top a zero e tutto affidato alla trasformazione: la scatola non
+       ha una larghezza imposta, quindi — essendo fissa con width:auto — si
+       stringe sul testo. E' la cosa che conta.
+
+       Con una larghezza imposta e text-align:center il testo NON si centra:
+       quando e' piu' largo della scatola il browser lo allinea al bordo di
+       partenza e lo fa sbordare tutto dall'altra parte. Misurato: 217 px
+       fuori centro, che moltiplicati per la scala 1,65 del viaggio
+       diventavano 358 px — la scritta compariva spostata di mezzo schermo
+       rispetto al buco nell'inchiostro, e per un istante si vedevano due
+       titoli. Una scatola che si stringe sul testo non puo' avere quel
+       problema: il suo centro E' il centro del testo. */
+    '.cnsg-titolo{position:fixed;left:0;top:0;z-index:7;margin:0;white-space:nowrap;',
+      'transform-origin:0 0;pointer-events:none;opacity:0;',
+      'transition:opacity .18s linear;will-change:transform}',
     '.cnsg-titolo.is-on{opacity:1}',
     '.cnsg-titolo .cnsg-char{display:inline-block}',
     '.cnsg-titolo .cnsg-spazio{display:inline-block;white-space:pre}',
@@ -354,7 +373,21 @@ function init(){
 
   function misura(){
     var h = sez.offsetHeight || window.innerHeight;
-    topIncollo = Math.max(0, Math.round((window.innerHeight - h) / 2));
+    /* Il centraggio puo' essere NEGATIVO, e deve poterlo essere.
+
+       La sezione e' alta 52vw. Su uno schermo 16:9 pieno ci sta; dentro una
+       finestra di browser vera — 1918 x 870, con la barra degli indirizzi e
+       le schede — sono 997 px in 870, e non ci sta per 127.
+
+       Con un top bloccato a zero la sezione si incollava in cima e quei 127
+       px uscivano tutti dal fondo: la barra del carosello finiva a 898, sotto
+       il bordo, e il titolo a -17, sopra. La sezione sembrava vuota mentre in
+       realta' era intera, solo fuori dallo schermo.
+
+       Con un top negativo si incolla centrata e il taglio si divide fra sopra
+       e sotto: meta' per uno, dove non c'e' niente da vedere. position:sticky
+       accetta un top negativo senza fare storie. */
+    topIncollo = Math.round((window.innerHeight - h) / 2);
     sez.style.setProperty('--cnsg-top', topIncollo + 'px');
     viaggio  = Math.max(1, VIAGGIO_VH * window.innerHeight);
     sosta    = Math.max(0, SOSTA_VH * window.innerHeight);
@@ -489,11 +522,17 @@ function init(){
        ferma prima: non supera il 94% dello schermo, che e' la stessa soglia
        a cui il motore manda a capo. Sopra i 1400px questo tetto non tocca
        mai e la misura resta identica all'inchiostro. */
-    var tetto = (window.innerWidth * 0.94) / B.width;
+    /* Il tetto si misura sulla scatola del CLONE, larga quanto il suo testo,
+       non su quella del titolo dello slider: sono due scritte diverse. */
+    var largo = clone.offsetWidth || B.width;
+    var tetto = (window.innerWidth * 0.94) / largo;
     if(k > tetto) k = tetto;
-    var dx    = window.innerWidth / 2  - (B.left + B.width / 2);
-    var dy    = window.innerHeight / 2 - (B.top + perno);
-    var u     = 1 - q;
+
+    var cx = B.left + B.width / 2;              /* dove arriva: centro del titolo */
+    var cy = B.top + perno;                     /* ...e centro delle sue maiuscole */
+    var dx = window.innerWidth / 2  - cx;       /* da dove parte: centro schermo   */
+    var dy = window.innerHeight / 2 - cy;
+    var u  = 1 - q;
 
     /* Le lettere dell'inchiostro sono #141416 — e' il colore della slide che
        si vede attraverso, non una scelta — e il titolo del carosello
@@ -501,11 +540,17 @@ function init(){
        viaggio invece di cambiare colore di scatto all'arrivo. */
     clone.style.color = 'rgb(' + Math.round(20 + 17 * q) + ',' + Math.round(20 + 22 * q) + ',' + Math.round(22 + 12 * q) + ')';
 
-    clone.style.left           = B.left + 'px';
-    clone.style.top            = B.top + 'px';
-    clone.style.width          = B.width + 'px';
-    clone.style.transformOrigin = '50% ' + perno + 'px';
-    clone.style.transform      = 'translate3d(' + (dx * u) + 'px,' + (dy * u) + 'px,0) scale(' + (1 + (k - 1) * u) + ')';
+    /* Si legge da destra a sinistra, che e' l'ordine in cui si applicano:
+       1. translate(-50%, -perno) porta il CENTRO DELLE MAIUSCOLE del clone
+          sull'origine — da li' in poi il punto che si muove e' quello che
+          l'occhio guarda, non un angolo della scatola;
+       2. scale ingrandisce attorno a quel punto, che quindi non si sposta;
+       3. l'ultima translate lo porta dove deve stare.
+       Con l'origine a 0 0 non c'e' nessuna percentuale da interpretare. */
+    clone.style.transform =
+      'translate3d(' + (cx + dx * u).toFixed(2) + 'px,' + (cy + dy * u).toFixed(2) + 'px,0)' +
+      ' scale(' + (1 + (k - 1) * u).toFixed(4) + ')' +
+      ' translate(-50%,' + (-perno).toFixed(2) + 'px)';
   }
 
   /* ——— l'onda di luce ————————————————————————————————————————————
@@ -766,6 +811,25 @@ function init(){
     vivo = es[0].isIntersecting;
     if(vivo) sveglia();
   }, { rootMargin: '150% 0px' }).observe(sez);
+
+  /* Un secondo osservatore, questo stretto: se la sezione esce davvero dallo
+     schermo mentre il montaggio sta ancora girando, il montaggio si chiude
+     di colpo invece di continuare dove non lo guarda piu' nessuno.
+
+     Serve perche' la coreografia dura un tempo suo, slegato dallo scroll:
+     una rotellata lunga puo' sempre scavalcarla, per quanto si allunghi la
+     riserva. Se succede, l'importante e' che tornando indietro la sezione si
+     trovi montata e non a meta' — con le fotografie ancora sotto il velo e
+     mezzo titolo spento.
+
+     E' lo stesso rimedio che il carosello usa gia' per il cambio opera:
+     chiudiSubito() porta a fondo corsa quello che stava girando. */
+  new IntersectionObserver(function(es){
+    if(es[0].isIntersecting) return;
+    if(tlMontaggio && montata && tlMontaggio.progress() < 1){
+      tlMontaggio.progress(1);
+    }
+  }, { rootMargin: '0px' }).observe(sez);
 
   var rT = null;
   window.addEventListener('resize', function(){
