@@ -128,6 +128,19 @@
       }
     }, { rootMargin:'25% 0px' }).observe(sec);
   }
+  /* La barra in alto e il filo dello scroll si scelgono il colore misurando
+     il fondo, ma un <video> non ha colore di fondo: la sonda gli guarda
+     attraverso, legge il bianco della pagina e sopra il filmato restano
+     scuri, cioe' illeggibili. Lo dichiara la fessura, che e' la cosa scura
+     vera: finche' e' chiusa e' alta zero e non conta per nessuno dei due,
+     e ognuno passa al chiaro quando il riquadro arriva alla sua altezza. */
+  var fessura = sec.querySelector('.cape-open-frame');
+  if(fessura) fessura.setAttribute('data-hdr', 'dark');
+
+  window.capePatti && capePatti.dichiara('tendina del filmato', {
+    scrivo: [['data-hdr', '.cape-open-frame', 'sopra il filmato barra e filo vanno chiari']]
+  });
+
   if(!righe.length || ridotto) return;
   var slitte = righe.map(function(r){
     var w = document.createElement('span');
@@ -137,6 +150,31 @@
     r.classList.add('cape-rise');
     return w;
   });
+  /* Di quanto scendere per sparire DAVVERO.
+
+     Il ritaglio che tiene nascosto il testo e' il riquadro del GENITORE, e
+     quel ritaglio sborda di 0.14em sotto (sta nell'head, serve a non tagliare
+     accenti e discendenti). Scendere del 110% dell'altezza PROPRIA — che e'
+     un'altra misura ancora, piu' piccola del genitore appena il contenitore
+     e' un filo piu' alto del testo — lasciava la cima delle lettere dentro
+     quello sbordo: e' la riga di nero che si vedeva sotto ogni riga del
+     titolo.
+
+     Si misura allora il riquadro vero, il piu' alto dei due, e si aggiunge
+     mezzo corpo. Il margine va in em e non in percentuale perche' lo sbordo
+     da battere e' 0.14em: legato al corpo del carattere resta giusto anche
+     quando il titolo cresce con la finestra. Se la misura non si puo' fare,
+     si ripiega su una percentuale comunque piu' generosa. */
+  function giu(w){
+    var h = 0, corpo = 0;
+    try{
+      var box = w.parentNode;
+      h = Math.max(box ? box.getBoundingClientRect().height : 0,
+                   w.getBoundingClientRect().height);
+      corpo = parseFloat(getComputedStyle(box || w).fontSize) || 0;
+    }catch(e){}
+    return h > 0 ? Math.ceil(h + corpo * 0.5 + 12) + 'px' : '135%';
+  }
   var corse = [], giocate = false;
   function arma(){
     corse.forEach(function(a){ try{ a.cancel(); }catch(e){} });
@@ -145,7 +183,7 @@
     sec.classList.add('is-armed');
     slitte.forEach(function(w){
       w.parentNode.classList.add('is-armed');
-      w.style.transform = 'translateY(110%)';
+      w.style.transform = 'translateY(' + giu(w) + ')';
     });
   }
   function gioca(){
@@ -154,7 +192,7 @@
     var resta = slitte.length;
     slitte.forEach(function(w, i){
       var a = w.animate(
-        [{ transform:'translateY(110%)' }, { transform:'translateY(0)' }],
+        [{ transform:'translateY(' + giu(w) + ')' }, { transform:'translateY(0)' }],
         { duration:DUR, delay:i * STAGGER, easing:EASE, fill:'both' }
       );
       corse.push(a);
