@@ -71,14 +71,14 @@ var SOSTA_VH   = 2.00; /* LA TENUTA — schermate di scroll in cui, a titolo
                           coreografia AGGIUNGE alla pagina.
 
                           Era 1.00 e non bastava: il montaggio dura quasi due
-                          secondi — onda, tendine, scivolata del velo — e una
-                          schermata di riserva si consuma in poco piu' di
-                          uno. La sezione se ne andava a meta' coreografia,
-                          con le fotografie ancora sotto il velo.
+                          secondi — scambio delle lettere, tendine, scivolata
+                          del velo — e una schermata di riserva si consuma in
+                          poco piu' di uno. La sezione se ne andava a meta'
+                          coreografia, con le fotografie ancora sotto il velo.
 
-                          E' la manopola da girare per prima se la sezione
-                          ti sembra che si fermi troppo: portala a 1.4 e
-                          accorcia LUCE_DUR nella stessa misura.            */
+                          E' la manopola da girare per prima se la sezione ti
+                          sembra che si fermi troppo: portala a 1.4 e accorcia
+                          SCAMBIO_DUR nella stessa misura.                  */
 
 var MORBIDEZZA = 0.14; /* 0..1 — quanto il viaggio insegue lo scroll invece
                           di esserci incollato. E' lo stesso inseguimento
@@ -102,36 +102,40 @@ var SCAMBIO    = 0;    /* secondi della dissolvenza con cui il clone prende
                           scambio in un fotogramma non ha nessuna finestra in
                           cui le due possano separarsi.                     */
 
-var LUCE_DUR   = 0.95; /* secondi dell'onda di luce sul titolo.             */
+var SCAMBIO_DUR = 0.55; /* secondi del riposizionamento di una lettera. */
 
-var LUCE_ORLO  = 0.30; /* larghezza del fronte di luce, in frazione
-                          dell'onda. Stretto = un lampo netto che corre;
-                          largo = mezzo titolo acceso insieme. Sotto 0.12 la
-                          lettera non fa in tempo ad accendersi.            */
+var SCAMBIO_SPAZZATA = 0.45; /* secondi fra la prima lettera che si muove e
+                          l'ultima. Non e' un passo fisso: l'ordine lo detta
+                          la mappa dell'inchiostro, questo e' solo quanto la
+                          si allarga nel tempo. A zero partono tutte insieme
+                          e si legge come un taglio; a 0.45 si legge come un
+                          movimento, e i grumi del fluido si vedono.       */
 
-var LUCE_COL   = [255, 247, 226];  /* il colore della luce, RGB.            */
-var TESTO_COL  = [37, 42, 34];     /* #252a22, il colore del titolo a riposo*/
+var SCAMBIO_SALTO = 1.15; /* di quanto una lettera esce in alto e la sua
+                          sostituta entra dal basso, in altezze di lettera.
+                          Sopra 1 vuol dire che esce di scena per davvero
+                          prima che l'altra arrivi al suo posto.           */
 
-var USCITA     = 0.45; /* secondi della dissolvenza in uscita, scrollando in
-                          su.                                              */
+var SCAMBIO_EASE = 'power3.inOut'; /* stessa curva per chi si sposta, chi
+                          esce e chi entra: e' un movimento solo.          */
 
-var USCITA_R   = 0.28; /* quanta TENUTA si tiene da parte per l'uscita, in
-                          frazione della riserva.
+var FILO_INK   = 0.1;  /* ——— IL FILO CHE ASSOTTIGLIA ————————————————
+                          Le lettere dipinte dall'inchiostro escono un filo
+                          piu' magre di quelle vere: passano per una maschera
+                          e per una simulazione, e ci lasciano una frazione
+                          di pixel per lato. Misurato al banco: 1.4% di area
+                          coperta in meno, a geometria ormai identica al
+                          pixel. E' tutto quello che resta del distacco.
 
-                          Tornando indietro, viaggio e tenuta si susseguono
-                          senza sovrapporsi: finche' si consuma la riserva il
-                          progresso resta a 1 e non succede niente, e appena
-                          scende sotto 1 la sezione si stacca e comincia a
-                          scorrere giu'. Dissolvenza e scorrimento partivano
-                          cosi' nello stesso istante, e quello che si vedeva
-                          era una sezione che se ne va — non una che svanisce.
-
-                          Con questa fetta lo smontaggio comincia mentre la
-                          sezione e' ancora incollata, e quando si stacca la
-                          dissolvenza e' gia' finita. A 0.28 di due schermate
-                          sono quasi cinquecento pixel: alla velocita' di una
-                          rotellata normale, giusto i quattro decimi di
-                          secondo di USCITA.                                */
+                          Questo e' un contorno del colore del fondo, in
+                          pixel, che il clone porta quando e' a grandezza
+                          d'inchiostro e perde man mano che rimpicciolisce:
+                          mangia da fuori esattamente quello che la maschera
+                          mangiava. A zero e' spento, e il valore si trova
+                          misurando — non a occhio: al banco 0.1 porta la
+                          differenza di area da +1.41% a -0.04%, e 0.2 la
+                          ribalta a -1.98%. Se in pagina si vedesse ancora, e'
+                          questa la manopola, e si gira di un decimo.       */
 
 var MIN_W      = 992;  /* sotto questa larghezza non si fa niente.          */
 
@@ -481,12 +485,20 @@ function init(){
   }
 
   /* ——— il viaggio ————————————————————————————————————————————————— */
-  var p = 0, armato = false, montata = false, tlMontaggio = null;
+  var p = 0, armato = false, montata = false;
   var cloneChars = [], vivo = false, girando = false, ultimo = 0, primo = true;
-  var assestata = false;
-  /* usciti dalla tenuta in su: il montaggio resta chiuso finche' non si
-     rientra o non si torna al viaggio. Vedi la guardia in giro(). */
-  var uscito = false;
+  /* Due timeline, due vite diverse. tlSezione gira una volta sola in tutta la
+     pagina — sezioneFatta se lo ricorda. tlScambio invece va avanti e
+     indietro, una volta per ogni passata del titolo. */
+  var tlSezione = null, tlScambio = null, sezioneFatta = false;
+  /* le lettere del titolo per cui tlScambio e' stata costruita: se cambiano,
+     la timeline non vale piu' */
+  var firmaScambio = '';
+  /* il punto da cui il titolo parte, congelato appena si stacca: vedi
+     piazza(). Si azzera a ogni nuova misura, che e' quando puo' cambiare. */
+  var partenza = null;
+  /* e dove va a posarsi, misurato a lettere ferme: vedi piazza() */
+  var arrivo = null;
 
   function vestiClone(){
     var cs = getComputedStyle(titolo);
@@ -600,6 +612,16 @@ function init(){
   /* Il centro di cio' che l'inchiostro dipinge, adesso. Si rilegge a ogni
      fotogramma apposta: il pilastro si muove, e il punto d'arrivo del
      viaggio deve muoversi con lui. */
+  /* L'inchiostro e' ancora incollato? Finche' lo e', le sue lettere stanno
+     ferme nello schermo e il titolo puo' inseguirle; quando il suo pilastro
+     finisce se ne vanno su, e da li' in poi inseguirle vorrebbe dire curvare
+     dietro a qualcosa che non si vede nemmeno piu'. */
+  function inkIncollato(){
+    if(!pinInk) return false;
+    var r = pinInk.getBoundingClientRect();
+    return r.top <= 1 && r.bottom >= window.innerHeight - 1;
+  }
+
   function centroInk(){
     var cv = stkInk && stkInk.querySelector('canvas');
     if(cv){
@@ -695,6 +717,14 @@ function init(){
     document.documentElement.classList.add('is-consegna');
 
     inkMis = null;
+    partenza = null;
+    arrivo = null;
+    /* Qui sotto spezza() butta via le lettere del clone e ne fa di nuove: la
+       timeline dello scambio punterebbe a nodi che non sono piu' in pagina.
+       Si puo' buttare senza pensarci — a questo punto del viaggio il titolo
+       e' all'inchiostro e lo scambio e' comunque a zero. */
+    if(tlScambio){ tlScambio.kill(); tlScambio = null; }
+    firmaScambio = '';
     vestiClone();
     cloneChars = spezza(testoInk());
     clone.classList.add('is-on');
@@ -818,14 +848,92 @@ function init(){
     if(!(Fink > 0)) Fink = F;
 
     var Fq     = F + (Fink - F) * u;                 /* il corpo adesso        */
-    var spQ    = spazioTit + ((mis ? mis.spEm : spazioTit) - spazioTit) * u;
+
+    /* ——— IL TRACCIAMENTO NON SI INTERPOLA ————————————————————————
+       Le due scritte non hanno la stessa spaziatura: l'inchiostro scrive a
+       .02em, il titolo dell'opera a -0.02em. Prima si passava dall'una
+       all'altra lungo il viaggio, e sembrava la cosa ovvia da fare.
+
+       Ma una scritta che cambia tracciamento mentre rimpicciolisce non e'
+       un rimpicciolimento: e' un rimpicciolimento piu' una deformazione, il
+       7% di larghezza a parita' di corpo. E una deformazione fa uscire le
+       lettere dalla retta — sono i quarantanove pixel che restavano dopo
+       aver fermato i due estremi, e il conto torna al pixel: il 7% di
+       millequattrocento, diviso due perche' ancorato al centro.
+
+       Quindi il viaggio tiene il tracciamento dell'inchiostro dal primo
+       all'ultimo fotogramma. Largo ∝ corpo, ingrandimento puro, ogni lettera
+       su una retta.
+
+       Il conto non torna piu' all'arrivo — il clone resta un 7% piu' largo
+       del titolo vero — e va benissimo: a chiudere quella differenza ci
+       pensa lo scambio, che ogni lettera la porta al suo posto misurato, uno
+       per uno. Quel 7% non e' un errore da correggere prima, e' esattamente
+       il "riposizionarsi pronte per il titolo". */
+    var spQ    = mis ? mis.spEm : spazioTit;
     var perno  = centroMaiuscole(Fq, rapp * Fq);     /* il suo centro maiuscole*/
 
     /* Dove arriva: il punto in cui si poserebbe una scritta larga come la
        nostra, allineata come sono allineate le altre. */
-    var anc = ancora();
-    var cx0 = B.left + anc * B.width + (0.5 - anc) * largo;
-    var cy0 = B.top + centroMaiuscole(F, L);
+    /* ——— IL PUNTO CHE SI GUARDA ————————————————————————————————————
+       Non e' il centro della scritta: e' il punto da cui la riga si legge.
+       Con un titolo allineato a sinistra e' il suo inizio, a destra la sua
+       fine, centrato il centro — ed e' esattamente quello che dice ancora().
+
+       Serve perche' il tracciamento delle due scritte non e' lo stesso —
+       l'inchiostro scrive a .02em, il titolo a -0.02em — e lungo il viaggio
+       si interpola. Quindi la scritta non rimpicciolisce e basta: cambia
+       anche un pelo di forma, il 7% di larghezza a parita' di corpo. Quel
+       poco non si puo' togliere, perche' e' proprio cio' che fa combaciare i
+       due estremi. Ma si puo' scegliere DOVE farlo cadere: ancorando al
+       centro si spalmava meta' per parte, e l'inizio della riga — il punto
+       che l'occhio insegue — descriveva un arco di ottantotto pixel. E' la
+       curva che si vedeva.
+
+       Ancorando invece al punto di lettura, quel punto scorre su una retta e
+       il gioco del tracciamento resta tutto in coda, dove nessuno lo segue. */
+    /* ——— IL BERSAGLIO SI MISURA A LETTERE FERME —————————————————
+       Il bersaglio sono le lettere del titolo. Ma lo scambio LE MUOVE: le
+       porta al loro posto, le fa uscire in alto, le fa entrare dal basso. Se
+       il bersaglio si rileggesse mentre lo scambio sta girando, il titolo
+       inseguirebbe le lettere che lui stesso sta spostando — e infatti
+       nell'ultimo fotogramma del viaggio saltava di cinquanta pixel.
+
+       Quindi si misura solo quando sono ferme, e per il resto si tiene il
+       numero. Tanto e' una posizione A RIPOSO: non dipende dallo scroll, e
+       cambia solo se cambia il titolo o la finestra. */
+    var ferme = !montata && (!tlScambio || !tlScambio.isActive());
+    if(!arrivo || ferme){
+      arrivo = {
+        anc: ancora(),
+        x:   0,
+        y:   topIncollo + (B.top - sez.getBoundingClientRect().top)
+      };
+      arrivo.x = B.left + arrivo.anc * B.width;
+    }
+    var anc = arrivo.anc;
+    var cx0 = arrivo.x;
+
+    /* ——— IL BERSAGLIO STA FERMO ———————————————————————————————————
+       Qui c'era B.top, cioe' dove il titolo si trova ADESSO. Ed e' da li'
+       che veniva la curva.
+
+       Durante il viaggio la sezione studio non e' ancora incollata: sta
+       ancora salendo con lo scroll, un'intera schermata. Quindi il titolo
+       puntava a un bersaglio in movimento, e la somma di un rimpicciolimento
+       dritto e di un bersaglio che scappa non e' una retta — e' un arco.
+       Misurato: ottantaquattro pixel di pancia, e a meta' strada la scritta
+       tornava perfino indietro in su. Cambiare il modo di interpolare non
+       serviva a niente (l'ho provato: da 84 a 88), perche' il problema non
+       era l'interpolazione.
+
+       Adesso si punta a dove il titolo SARA' quando la sezione si sara'
+       fermata: il bordo alto della sezione a riposo e' topIncollo, e dentro
+       la sezione il titolo sta sempre alla stessa altezza. Due punti fermi
+       nello schermo, uno all'inizio e uno alla fine, e in mezzo una retta.
+       All'arrivo le due cose coincidono di nuovo, perche' li' la sezione e'
+       davvero ferma a topIncollo. */
+    var cy0 = arrivo.y + centroMaiuscole(F, L);
     /* E da dove parte: NON il centro dello schermo — il centro del canvas.
        Sono la stessa cosa solo finche' il pilastro dell'inchiostro e'
        incollato, e proprio nell'istante dello scambio puo' non esserlo piu':
@@ -836,9 +944,31 @@ function init(){
        trenta pixel di scarto verticale. Si legge il riquadro vero, che e'
        anche la definizione che usa chi dipinge (centrato in w/2, h/2 della
        griglia, e la griglia sta a inset:0 nello stick). */
-    var C   = centroInk();
-    var cx  = cx0 + (C.x - cx0) * u;
-    var cy  = cy0 + (C.y - cy0) * u;
+    /* ——— E ANCHE LA PARTENZA STA FERMA ——————————————————————————
+       Stesso discorso del bersaglio, dall'altro capo. Il punto di partenza e'
+       il canvas dell'inchiostro, che sta incollato — ma non per sempre: il
+       suo pilastro a un certo punto finisce e se ne va su. Se succede mentre
+       il titolo e' per strada, anche la partenza diventa un bersaglio in
+       movimento, e la retta torna a essere un arco.
+
+       Quindi: finche' il titolo e' ADDOSSO all'inchiostro lo si insegue, ed
+       e' quello che tiene le due scritte sovrapposte al pixel nell'istante
+       dello scambio. Appena parte, il punto si congela. Da li' in poi sono
+       due punti fermi e in mezzo una retta.
+
+       Il 0.995 non e' delicato: e' "il titolo e' ancora sopra l'inchiostro". */
+    if(inkIncollato() || !partenza){
+      var Cink = centroInk();
+      partenza = { x: Cink.x + (anc - 0.5) * (mis ? mis.largo : largo), y: Cink.y };
+    }
+    var C = partenza;
+
+    /* Fermi i due estremi, la posizione e' una retta e basta. (Ci avevo
+       messo in mezzo un'omotetia attorno a un punto fermo: siccome il corpo
+       e' gia' lineare in u, quel conto da' esattamente questi stessi numeri.
+       Trenta righe per dire lerp.) */
+    var cx = cx0 + (C.x - cx0) * u;
+    var cy = cy0 + (C.y - cy0) * u;
 
     /* Le lettere dell'inchiostro sono #141416 — e' il colore della slide che
        si vede attraverso, non una scelta — e il titolo del carosello
@@ -853,20 +983,67 @@ function init(){
        2. scale ingrandisce attorno a quel punto, che quindi non si sposta;
        3. l'ultima translate lo porta dove deve stare.
        Con l'origine a 0 0 non c'e' nessuna percentuale da interpretare. */
+    /* Il filo del colore del fondo che pareggia lo spessore con le lettere
+       dipinte: pieno a grandezza d'inchiostro, via via niente mentre la
+       scritta rimpicciolisce, perche' all'arrivo il titolo dell'opera deve
+       essere il titolo dell'opera e nient'altro. */
+    if(FILO_INK > 0){
+      var filo = FILO_INK * u;
+      if(clone._filo !== filo){
+        clone._filo = filo;
+        clone.style.webkitTextStrokeWidth = filo.toFixed(3) + 'px';
+        clone.style.webkitTextStrokeColor = FONDO_SEZ;
+      }
+    }
+
     if(Math.abs(parseFloat(clone.style.fontSize) - Fq) > 0.05) clone.style.fontSize = Fq.toFixed(2) + 'px';
     if(Math.abs(parseFloat(clone.style.letterSpacing) / Fq - spQ) > 0.0005) clone.style.letterSpacing = spQ.toFixed(5) + 'em';
     clone.style.transform =
       'translate3d(' + cx.toFixed(2) + 'px,' + cy.toFixed(2) + 'px,0)' +
-      ' translate(-50%,' + (-perno).toFixed(2) + 'px)';
+      ' translate(' + (-anc * 100).toFixed(1) + '%,' + (-perno).toFixed(2) + 'px)';
   }
 
-  /* ——— l'onda di luce ————————————————————————————————————————————
-     Per ogni lettera: a che punto della corsa l'inchiostro sarebbe arrivato
-     li'. E' la mappa della sezione sopra, letta nel punto dello schermo dove
-     la lettera si trova adesso. Torna null finche' la mappa non e' cotta, o
-     se l'inchiostro su questa macchina non c'e' proprio: in quel caso si
-     ripiega su un ordine da sinistra a destra con un filo di disordine, che
-     non e' la stessa cosa ma non lascia la sezione senza titolo. */
+  /* ——— LO SCAMBIO DELLE LETTERE ——————————————————————————————————
+     Arrivato in fondo al viaggio il clone e' esattamente sopra il titolo
+     dell'opera: stesso corpo, stessa riga di base, stesso punto di partenza.
+     Ma dice un'altra cosa — ART AND FASHION contro, per dire, TRACE OF A
+     VISAGE — quindi le sue lettere non stanno dove quelle del titolo devono
+     stare.
+
+     Lo scambio lavora per POSTI, non per parole. Il posto i-esimo del titolo
+     e la lettera i-esima del clone (gli spazi non contano, li' non c'e'
+     niente da muovere):
+
+       stessa lettera  ->  non esce e non rientra. Si sposta e basta, dal
+                           punto dov'e' al punto dove serve. Una R che resta
+                           una R non ha motivo di andarsene e tornare.
+
+       lettera diversa ->  quella che c'e' va comunque verso il suo posto, e
+                           intanto se ne esce dall'alto; quella che serve
+                           entra dal basso, nello stesso posto, nello stesso
+                           momento. E' il movimento dei tabelloni delle
+                           stazioni, ed e' leggibile perche' la riga di
+                           mezzo — il posto — non si muove mai.
+
+     Le lettere del clone che avanzano escono in alto senza sostituta; i
+     posti del titolo che il clone non copre si riempiono dal basso senza
+     che nessuno debba uscire.
+
+     La timeline torna intera e si riavvolge: e' questo che permette al
+     titolo di tornare indietro scrollando in su senza che il resto della
+     sezione debba muovere un dito. */
+
+  /* ——— L'ORDINE: QUELLO DELL'INCHIOSTRO ————————————————————————
+     Per ogni posto: a che punto della corsa il fluido sarebbe arrivato li'.
+     E' la mappa della sezione sopra, letta nel punto dello schermo dove il
+     posto si trova. Normalizzata, perche' una riga di titolo sta dentro
+     pochi centesimi di corsa e senza normalizzare partirebbero tutte
+     insieme: si tiene l'ORDINE e i grumi — la fisica — e si butta la scala.
+
+     Le lettere non si muovono da sinistra a destra, quindi: si muovono nello
+     stesso ordine irregolare in cui l'inchiostro le aveva bagnate. Senza
+     inchiostro in pagina si ripiega su sinistra-destra con un filo di
+     disordine, che non e' la stessa cosa ma non lascia il titolo fermo. */
   function tempiDiArrivo(spans){
     var s = window.inkSection;
     var ok = !!(s && s.ready && typeof s.arrivalAt === 'function');
@@ -895,182 +1072,164 @@ function init(){
     }
     return out;
   }
-
-  /* Il colore a un dato grado di luce. Precalcolato su 33 gradini: un titolo
-     lungo sono quaranta lettere per sessanta fotogrammi, e comporre duemila
-     stringhe al secondo per una differenza che l'occhio non vede e' lavoro
-     buttato. */
-  var SCALINI = 32;
-  var TINTE = (function(){
-    var out = [], i, t, j, c = [];
-    for(i = 0; i <= SCALINI; i++){
-      t = i / SCALINI;
-      for(j = 0; j < 3; j++) c[j] = Math.round(TESTO_COL[j] + (LUCE_COL[j] - TESTO_COL[j]) * t);
-      out.push('rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')');
-    }
-    return out;
-  })();
-
-  function accendi(span, luce, opacita){
-    var i = luce <= 0 ? 0 : (luce >= 1 ? SCALINI : Math.round(luce * SCALINI));
-    if(span._luce !== i){
-      span._luce = i;
-      span.style.color = TINTE[i];
-      span.style.textShadow = i === 0 ? 'none'
-        : '0 0 ' + (0.10 + luce * 0.42).toFixed(3) + 'em rgba(' + LUCE_COL[0] + ',' + LUCE_COL[1] + ',' + LUCE_COL[2] + ',' + (luce * 0.85).toFixed(3) + ')'
-        + ', 0 0 ' + (0.30 + luce * 1.10).toFixed(3) + 'em rgba(' + LUCE_COL[0] + ',' + LUCE_COL[1] + ',' + LUCE_COL[2] + ',' + (luce * 0.45).toFixed(3) + ')';
-    }
-    var o = opacita < 0 ? 0 : (opacita > 1 ? 1 : opacita);
-    if(span._op !== o){ span._op = o; span.style.opacity = o; }
+  /* La lettera che si VEDE. textContent puo' essere minuscolo con un
+     text-transform sopra che lo rende maiuscolo: confrontare i due testi
+     grezzi direbbe "diverse" su due lettere identiche sullo schermo, e lo
+     scambio le farebbe uscire e rientrare per niente. */
+  function lettera(span){
+    return ((span && span.textContent) || '').trim().toUpperCase();
   }
 
-  function spegni(span){
-    span._luce = undefined; span._op = undefined;
-    span.style.color = ''; span.style.textShadow = ''; span.style.opacity = '';
-  }
+  function scambio(vecchie, nuove){
+    var tl = gsap.timeline();
+    if(!nuove.length && !vecchie.length) return tl;
 
-  function onda(vecchie, nuove){
-    var tV = tempiDiArrivo(vecchie), tN = tempiDiArrivo(nuove);
-    var corsa = 1 - LUCE_ORLO;
-    var prog = { t: 0 };
-    var i;
+    /* I rettangoli si leggono PRIMA di scrivere qualunque cosa, e da uno
+       stato pulito: se restasse addosso una traslazione del giro precedente
+       la si misurerebbe come se fosse impaginazione, e al giro dopo la si
+       sommerebbe di nuovo. */
+    gsap.set(vecchie, { clearProps: 'transform,opacity' });
+    gsap.set(nuove,   { clearProps: 'transform' });
+    gsap.set(nuove,   { opacity: 0 });
 
-    for(i = 0; i < nuove.length; i++) accendi(nuove[i], 1, 0);
+    var rv = [], rn = [], i;
+    for(i = 0; i < vecchie.length; i++) rv.push(vecchie[i].getBoundingClientRect());
+    for(i = 0; i < nuove.length;   i++) rn.push(nuove[i].getBoundingClientRect());
 
-    return gsap.timeline().to(prog, {
-      t: 1, duration: LUCE_DUR, ease: 'none',
-      onUpdate: function(){
-        var q = prog.t, j, t;
-        /* la vecchia: si accende fino a meta' fronte, poi se ne va accesa */
-        for(j = 0; j < vecchie.length; j++){
-          t = clamp01((q - tV[j] * corsa) / LUCE_ORLO);
-          accendi(vecchie[j], t < 0.5 ? t / 0.5 : 1, t < 0.5 ? 1 : 1 - (t - 0.5) / 0.5);
-        }
-        /* la nuova: arriva accesa un po' dopo, e si raffredda */
-        for(j = 0; j < nuove.length; j++){
-          t = clamp01((q - tN[j] * corsa) / LUCE_ORLO);
-          t = clamp01((t - 0.42) / 0.58);
-          accendi(nuove[j], 1 - t, t);
-        }
-      },
-      onComplete: function(){
-        for(var j = 0; j < vecchie.length; j++) accendi(vecchie[j], 0, 0);
-        for(j = 0; j < nuove.length; j++) spegni(nuove[j]);
+    /* Di quanto si esce e si entra. Si misura sulla lettera, non su un
+       numero fisso: la stessa coreografia deve funzionare al breakpoint in
+       cui il titolo e' la meta'. */
+    var alt = 0;
+    for(i = 0; i < rn.length; i++) if(rn[i].height > alt) alt = rn[i].height;
+    for(i = 0; i < rv.length; i++) if(rv[i].height > alt) alt = rv[i].height;
+    var salto = (alt || 40) * SCAMBIO_SALTO;
+
+    var n = Math.max(vecchie.length, nuove.length);
+
+    /* Il posto i-esimo si muove quando l'inchiostro ci sarebbe arrivato. Si
+       legge la mappa dove l'azione avviene: sul posto del titolo, e sulla
+       lettera del clone solo per quelle che avanzano e non hanno un posto. */
+    var dove = [];
+    for(i = 0; i < n; i++) dove.push(nuove[i] || vecchie[i]);
+    var quando = tempiDiArrivo(dove);
+
+    for(i = 0; i < n; i++){
+      var v = vecchie[i], w = nuove[i], t = quando[i] * SCAMBIO_SPAZZATA;
+
+      if(v && w && lettera(v) === lettera(w)){
+        tl.to(v, { x: rn[i].left - rv[i].left,
+                   y: rn[i].top  - rv[i].top,
+                   duration: SCAMBIO_DUR, ease: SCAMBIO_EASE }, t);
+        /* Lo scambio fra le due copie avviene a movimento finito, quando
+           sono sovrapposte: due glifi uguali, stesso carattere e stesso
+           corpo, nello stesso punto. Non si vede niente perche' non c'e'
+           niente da vedere. */
+        tl.set(w, { opacity: 1 }, t + SCAMBIO_DUR);
+        tl.set(v, { opacity: 0 }, t + SCAMBIO_DUR);
+      } else {
+        if(v) tl.to(v, { x: w ? rn[i].left - rv[i].left : 0,
+                         y: -salto, opacity: 0,
+                         duration: SCAMBIO_DUR, ease: SCAMBIO_EASE }, t);
+        if(w) tl.fromTo(w, { y: salto, opacity: 0 },
+                           { y: 0, opacity: 1,
+                             duration: SCAMBIO_DUR, ease: SCAMBIO_EASE }, t);
       }
-    });
+    }
+    return tl;
   }
 
-  /* ——— il montaggio ——————————————————————————————————————————————— */
+  /* ——— il montaggio, UNA VOLTA SOLA —————————————————————————————
+     La coreografia della sezione — le righe a tendina, la barra che sale, il
+     velo che scivola via dalle fotografie, la cornice che si accende — e' un
+     arrivo. Un arrivo si fa una volta.
+
+     Prima si disfaceva e si rifaceva a ogni passata, e rivedere la stessa
+     entrata per la terza volta non la fa sembrare curata: la fa sembrare
+     bloccata. Adesso gira al primo scroll e poi la sezione resta com'e' per
+     il resto della vita della pagina.
+
+     Quello che continua ad andare avanti e indietro e' il titolo, e basta:
+     e' lui il ponte fra le due sezioni, e deve poter tornare al suo posto in
+     cima se si risale. Da qui le due timeline separate — tlSezione, che gira
+     una volta e non si tocca piu', e tlScambio, che si riavvolge. */
   function monta(){
     if(montata) return;
     montata = true;
 
-    var nuove = studio.lettere();
-    if(nuove.length) gsap.set(nuove, { opacity: 0 });
-
-    /* La timeline si costruisce PRIMA di scoprire la sezione, e in pausa.
-       Costruirla applica gia' lo stato di partenza — righe sotto il bordo,
-       cornice spenta, lettere nuove a zero — quindi quando la sezione si
-       scopre non c'e' nessun fotogramma in cui si vede qualcosa al posto
-       sbagliato. E' l'ordine che conta: prima si prepara, poi si alza il
-       sipario. */
-    if(tlMontaggio) tlMontaggio.kill();
-    tlMontaggio = gsap.timeline({ paused: true, onComplete: montato });
-
-    if(cloneChars.length && nuove.length) tlMontaggio.add(onda(cloneChars, nuove), 0);
-    tlMontaggio.add(studio.entrataRighe(), 0);
-    if(pagerLn) tlMontaggio.add(studio.tendina([pagerLn]), 0);
-    gsap.set(coperta, { clearProps: 'opacity' });
-    tlMontaggio.add(studio.sfoglia(coperta, -1), 0);
-    if(edge) tlMontaggio.fromTo(edge, { opacity: 0 }, { opacity: 1, duration: 0.6, ease: 'power2.out' }, 0.35);
-
-    sez.classList.remove('cnsg-attesa');
-    tlMontaggio.play(0);
-  }
-
-  function montato(){
-    document.documentElement.classList.remove('is-consegna');
-    coperta.classList.add('is-via');
-    studio.riprendi();
-  }
-
-  /* Scrollando in su: svanisce quello che era comparso, il titolo riprende il
-     viaggio al contrario. Non si riavvolge la coreografia — e' una
-     dissolvenza, come deve essere in uscita. */
-  function smonta(){
-    if(!montata) return;
-    montata = false;
-    assestata = false;
-    if(tlMontaggio){ tlMontaggio.kill(); tlMontaggio = null; }
-    /* Si torna al viaggio, quindi la planata torna ferma — l'aveva liberata
-       la fine del montaggio. Senza questa riga, appena il fade e' finito
-       scatterebbe e riporterebbe la sezione al centro, annullando lo scroll
-       in su che l'utente ha appena fatto. Si libera di nuovo in disarma(),
-       quando il titolo e' tornato all'inchiostro. */
     document.documentElement.classList.add('is-consegna');
     studio.sospendi();
 
-    var nuove = studio.lettere();
-    var roba = [info, pager, edge].filter(Boolean);
+    var nuove = studio.lettere(), i, firma = '';
+    for(i = 0; i < nuove.length; i++) firma += lettera(nuove[i]);
 
-    if(roba.length){
-      gsap.killTweensOf(roba);
-      gsap.to(roba, { opacity: 0, duration: USCITA, ease: 'power2.out', onComplete: riposa });
+    /* Se il titolo e' ancora quello di prima si RIPRENDE la stessa timeline
+       da dove la risalita l'aveva lasciata, invece di rifarla da capo.
+       Conta perche' cambiare idea a meta' e' la cosa piu' normale del mondo:
+       si risale di poco, le lettere sono a mezz'aria, si ridiscende. Rifarla
+       vorrebbe dire rimisurare dei rettangoli che in quell'istante sono
+       sballati dalle traslazioni in corso, e far saltare tutto di scatto.
+
+       Se invece l'opera e' cambiata sotto — l'autoplay gira — i posti sono
+       altri e la timeline va rifatta: la firma del titolo se ne accorge. */
+    if(tlScambio && firma === firmaScambio){
+      /* gia' arrivata in fondo: non c'e' niente da riprendere, ma il
+         carosello e la planata aspettano ancora il via */
+      if(tlScambio.progress() >= 1) scambiato();
+      else tlScambio.play();
     } else {
-      riposa();
-    }
-    if(nuove.length){
-      gsap.killTweensOf(nuove);
-      gsap.to(nuove, { opacity: 0, duration: USCITA * 0.6, ease: 'power2.out' });
+      if(tlScambio) tlScambio.kill();
+      firmaScambio = firma;
+      tlScambio = scambio(cloneChars, nuove);
+      tlScambio.eventCallback('onComplete', scambiato);
+      tlScambio.play(0);
     }
 
-    /* Le fotografie devono SVANIRE, non sparire. Prima il velo bianco
-       tornava al suo posto con un display:block in riposa(), cioe' di
-       scatto e a dissolvenza gia' finita: il riquadro si spegneva di
-       botto. Adesso torna subito ma trasparente, e si riaccende con la
-       stessa dissolvenza di tutto il resto — che su un fondo bianco e'
-       esattamente "le fotografie svaniscono". */
-    gsap.killTweensOf(coperta);
-    coperta.classList.remove('is-via');
-    coperta.style.transform = '';
-    gsap.fromTo(coperta, { opacity: 0 },
-      { opacity: 1, duration: USCITA, ease: 'power2.out' });
+    if(sezioneFatta) return;
 
-    /* Il titolo dell'inchiostro deve tornare leggibile per rifare il
-       viaggio al contrario, ma non puo' ricomparire di scatto mentre quello
-       dell'opera sta ancora svanendo: per un terzo di secondo si vedrebbero
-       due scritte diverse sovrapposte. Rientra con la stessa dissolvenza con
-       cui l'altro se ne va. */
-    if(cloneChars.length){
-      var rit = { o: 0 };
-      gsap.to(rit, {
-        o: 1, duration: USCITA, ease: 'power2.out',
-        onUpdate: function(){
-          for(var i = 0; i < cloneChars.length; i++) accendi(cloneChars[i], 0, rit.o);
-        },
-        onComplete: function(){
-          for(var i = 0; i < cloneChars.length; i++) spegni(cloneChars[i]);
-        }
-      });
-    }
+    /* La sezione, solo la prima volta. La timeline si costruisce PRIMA di
+       scoprirla, e in pausa: costruirla applica gia' lo stato di partenza —
+       righe sotto il bordo, cornice spenta — quindi quando si alza il
+       sipario non c'e' nessun fotogramma con qualcosa al posto sbagliato. */
+    sezioneFatta = true;
+    if(tlSezione) tlSezione.kill();
+    tlSezione = gsap.timeline({ paused: true });
+
+    tlSezione.add(studio.entrataRighe(), 0);
+    if(pagerLn) tlSezione.add(studio.tendina([pagerLn]), 0);
+    gsap.set(coperta, { clearProps: 'opacity' });
+    tlSezione.add(studio.sfoglia(coperta, -1), 0);
+    if(edge) tlSezione.fromTo(edge, { opacity: 0 }, { opacity: 1, duration: 0.6, ease: 'power2.out' }, 0.35);
+    tlSezione.eventCallback('onComplete', function(){ coperta.classList.add('is-via'); });
+
+    sez.classList.remove('cnsg-attesa');
+    tlSezione.play(0);
   }
 
-  /* Rimette la sezione nello stato in cui la consegna la trova: tutto spento,
-     il velo di nuovo sul riquadro, le righe di nuovo sotto il proprio bordo.
-     Si ripulisce ogni stile scritto a mano invece di ricordarsi quali: una
-     lista da tenere aggiornata e' una lista che un giorno non lo e'. */
-  function riposa(){
-    if(montata) return;
-    sez.classList.add('cnsg-attesa');
-    coperta.classList.remove('is-via');
-    coperta.style.transform = '';
-    gsap.set(coperta, { clearProps: 'opacity' });
-    var spenti = [info, pager].filter(Boolean);
-    if(spenti.length) gsap.set(spenti, { clearProps: 'opacity' });
-    if(edge) gsap.set(edge, { clearProps: 'opacity' });
-    var nuove = studio.lettere(), i;
-    for(i = 0; i < nuove.length; i++) spegni(nuove[i]);
-    if(nuove.length) gsap.set(nuove, { clearProps: 'opacity' });
+  /* Titolo consegnato: la planata torna libera — qui la sezione e' incollata
+     al centro, quindi calcola una distanza di zero e non fa niente comunque —
+     e il carosello riprende a girare. */
+  function scambiato(){
+    document.documentElement.classList.remove('is-consegna');
+    studio.riprendi();
+  }
+
+  /* ——— e l'uscita, che adesso e' solo il titolo ————————————————————
+     Scrollando in su non svanisce piu' niente: la sezione resta esattamente
+     com'e', con le sue fotografie, le sue righe e la sua cornice. Torna
+     indietro il titolo, e ci torna riavvolgendo lo scambio — le lettere del
+     titolo se ne riscendono da dove erano venute, quelle dell'inchiostro
+     rientrano da sopra e si rimettono in fila. Poi il viaggio lo riporta in
+     cima, grande com'era.
+
+     Riavvolgere invece di rifare al contrario non e' un dettaglio: una
+     seconda animazione "di ritorno" sarebbe un secondo posto dove sbagliare
+     i numeri, e i due movimenti non combacerebbero mai del tutto. */
+  function smonta(){
+    if(!montata) return;
+    montata = false;
+    document.documentElement.classList.add('is-consegna');
+    studio.sospendi();
+    if(tlScambio) tlScambio.reverse();
   }
 
   /* ——— il giro ————————————————————————————————————————————————————— */
@@ -1133,38 +1292,20 @@ function init(){
 
     if(armato) piazza(CURVA ? morbida(p) : p);
 
-    var r = inRiserva();
-
-    /* L'uscita anticipata, dentro la tenuta. La fetta si arma solo dopo
-       esserne usciti almeno una volta: il montaggio avviene a riserva zero,
-       quindi senza questa guardia lo smontaggio scatterebbe nell'istante
-       stesso in cui la sezione finisce di montarsi.
-
-       E poi la guardia 'uscito', che e' quella che mancava. Uscendo dalla
-       tenuta scrollando in su, il VIAGGIO e' ancora a fondo corsa: p vale 1,
-       e continua a valere 1 per tutta la dissolvenza. La riga del montaggio
-       qui sotto guarda solo p, quindi al fotogramma successivo allo
-       smontaggio rimontava tutto da capo — velo che rifaceva la scivolata a
-       sbieco, righe che risalivano, cornice che si riaccendeva — sopra una
-       dissolvenza appena partita. E' il difetto che si vedeva: la roba
-       rifaceva l'entrata, e poi spariva di colpo quando il viaggio scendeva
-       davvero sotto 0.93.
-
-       Uscito dalla tenuta, quindi, il montaggio resta chiuso. Si riapre in
-       due modi soli, che sono i due modi veri di tornare ad aver senso:
-       rientrando nella tenuta (si scrolla di nuovo in giu': coreografia da
-       capo, com'e' giusto) oppure tornando indietro fino al viaggio, dove
-       p non vale piu' 1 e il montaggio e' comunque fuori questione. */
-    if(p <= 0.93 || r > USCITA_R + 0.12) uscito = false;
-    if(r > USCITA_R + 0.12) assestata = true;
-
     /* La soglia di smontaggio non e' 0.999 per non essere in balia di un
-       colpo di trackpad: sotto i 0.93 vuol dire che la sezione ha davvero
-       ricominciato a scendere, non che la rotella ha tremato. */
-    if(p >= 0.9995){ if(!uscito) monta(); }
-    else if(p <= 0.93) smonta();
+       colpo di trackpad: sotto i 0.93 vuol dire che il titolo ha davvero
+       ricominciato a scendere, non che la rotella ha tremato.
 
-    if(montata && assestata && r < USCITA_R){ uscito = true; smonta(); }
+       Non c'e' piu' nessuna uscita anticipata dentro la tenuta. Ce n'era una
+       perche' l'uscita era una dissolvenza di tutta la sezione e doveva
+       finire prima che la sezione si staccasse: si teneva da parte una fetta
+       di riserva apposta. Adesso in uscita non svanisce niente — torna solo
+       il titolo, e torna durante il viaggio, che e' esattamente il tratto di
+       scroll in cui la sezione e' ancora incollata. Il problema non si pone
+       piu', e con lui se ne vanno la fetta, la guardia che la armava e
+       quella che impediva al montaggio di ripartirci sopra. */
+    if(p >= 0.9995) monta();
+    else if(p <= 0.93) smonta();
 
     requestAnimationFrame(giro);
   }
@@ -1203,9 +1344,8 @@ function init(){
      chiudiSubito() porta a fondo corsa quello che stava girando. */
   new IntersectionObserver(function(es){
     if(es[0].isIntersecting) return;
-    if(tlMontaggio && montata && tlMontaggio.progress() < 1){
-      tlMontaggio.progress(1);
-    }
+    if(tlSezione && tlSezione.progress() < 1) tlSezione.progress(1);
+    if(tlScambio && montata && tlScambio.progress() < 1) tlScambio.progress(1);
   }, { rootMargin: '0px' }).observe(sez);
 
   var rT = null;
