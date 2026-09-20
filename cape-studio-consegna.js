@@ -200,6 +200,8 @@ var SEZ     = '.studio-hero';
 var TITOLO  = '.studio-headline__row';
 var GUSCIO  = '.studio-headline';
 var INFO    = '.studio-info';
+var DESC    = '[data-field="desc"]';
+var CTA     = '.studio-info__cta';
 var PAGER   = '.studio-pager';
 var STAGE   = '.studio-stage';
 var EDGE    = '.studio-stage__edge';
@@ -299,9 +301,15 @@ function vesti(){
        opacity 0 si spegne da solo. E le misure restano: il carosello
        impagina il titolo misurandolo, e un elemento senza misura gli
        farebbe sbagliare il corpo. */
-    '.cnsg-attesa .studio-headline,.cnsg-attesa .studio-info,',
+    /* Gli stessi pezzi che poi svaniscono, piu' il titolo — che all'inizio
+       e' nascosto perche' a mostrarne il testo ci pensa il clone. Si nomina
+       .studio-headline e non .studio-info: dentro .studio-info c'e' anche il
+       titolo, e piu' avanti quel blocco non va mai spento. */
+    '.cnsg-attesa .studio-headline,',
+      '.cnsg-attesa [data-field="desc"],',
+      '.cnsg-attesa .studio-info__cta,',
+      '.cnsg-attesa .studio-stage,',
       '.cnsg-attesa .studio-pager{opacity:0;pointer-events:none}',
-    '.cnsg-attesa .studio-stage__edge{opacity:0}',
 
     /* Sotto i 992px il ponte e' gia' spento e l'inchiostro ripiega da solo:
        qui non c'e' niente da consegnare. Il JS esce prima di toccare
@@ -311,11 +319,21 @@ function vesti(){
       '.cnsg-pin{height:auto}',
       '.cnsg-stick{position:static;height:auto}',
       '.cnsg-velo,.cnsg-titolo,.cnsg-coperta{display:none}',
-      '.cnsg-attesa .studio-headline,.cnsg-attesa .studio-info,',
-      '.cnsg-attesa .studio-pager,.cnsg-attesa .studio-stage__edge{',
-      'opacity:1;pointer-events:auto}}'
+      '.cnsg-attesa .studio-headline,.cnsg-attesa [data-field="desc"],',
+      '.cnsg-attesa .studio-info__cta,.cnsg-attesa .studio-stage,',
+      '.cnsg-attesa .studio-pager{opacity:1;pointer-events:auto}}'
   ].join('');
   document.head.appendChild(st);
+}
+
+/* Il primo della lista che occupa spazio sullo schermo. Un elemento dentro
+   un display:none non ne occupa: niente riquadri, niente righe. */
+function impaginato(lista){
+  for(var i = 0; i < lista.length; i++){
+    var e = lista[i];
+    if(e.offsetWidth || e.offsetHeight || e.getClientRects().length) return e;
+  }
+  return lista[0] || null;
 }
 
 function init(){
@@ -324,9 +342,18 @@ function init(){
   if(typeof gsap === 'undefined') return;
 
   var sez    = document.querySelector(SEZ);
-  var titolo = document.querySelector(TITOLO);
-  var guscio = document.querySelector(GUSCIO);
-  var info   = document.querySelector(INFO);
+  /* ——— IL TITOLO GIUSTO FRA I DUE ————————————————————————————————
+     In pagina ci sono DUE .studio-headline__row. Il secondo sta dentro
+     .studio-info__rule, che e' nascosto, e porta lo stesso data-field.
+     querySelector prende il primo e finora e' andata bene per caso: basta
+     che un domani cambi l'ordine nel Designer e si finisce a misurare un
+     elemento invisibile, che ha rettangoli tutti a zero. Allora si prende
+     il primo che e' DAVVERO impaginato, e la fortuna non c'entra piu'. */
+  var titolo = impaginato(document.querySelectorAll(TITOLO));
+  var guscio = titolo && titolo.closest(GUSCIO);
+  var info   = impaginato(document.querySelectorAll(INFO));
+  var desc   = info && info.querySelector(DESC);
+  var cta    = info && info.querySelector(CTA);
   var pager  = document.querySelector(PAGER);
   var stage  = document.querySelector(STAGE);
   var edge   = stage && stage.querySelector(EDGE);
@@ -465,6 +492,9 @@ function init(){
 
   /* ——— misure del binario ————————————————————————————————————————— */
   var topIncollo = 0, viaggio = 1, sosta = 0;
+  /* quanto scroll dura DAVVERO il viaggio: e' viaggio, oppure meno se
+     l'inchiostro finisce tardi. La scrive bersaglio(), la legge piazza(). */
+  var corsaViaggio = 1;
 
   function misura(){
     var h = sez.offsetHeight || window.innerHeight;
@@ -512,13 +542,43 @@ function init(){
     return clamp01((y - (naturale - topIncollo)) / sosta);
   }
 
+  /* Lo scroll al quale l'inchiostro finisce la sua corsa. Il suo pilastro e'
+     alto quanto la corsa piu' una schermata: la corsa e' finita quando ne ha
+     consumato tutta la differenza. */
+  function fineInchiostro(){
+    if(!pinInk) return -Infinity;
+    var y = window.scrollY || window.pageYOffset;
+    var alto = pinInk.getBoundingClientRect().top + y;
+    return alto + Math.max(0, pinInk.offsetHeight - window.innerHeight);
+  }
+
   function bersaglio(){
     var y = window.scrollY || window.pageYOffset;
     /* dalla SCATOLA, che non si incolla mai: il suo bordo alto e' il bordo
        alto naturale della sezione, sempre e su qualunque browser */
     var naturale = pin.getBoundingClientRect().top + y;
-    var inizio = naturale - topIncollo - viaggio;
-    return clamp01((y - inizio) / viaggio);
+    var fine = naturale - topIncollo;
+
+    /* ——— IL VIAGGIO NON PUO' COMINCIARE PRIMA DELL'INCHIOSTRO ————
+       Il viaggio partiva sempre una schermata prima dell'arrivo, e finche'
+       il pilastro dell'inchiostro era abbastanza lungo la cosa funzionava
+       per caso. In pagina non lo e': con 420vh di inchiostro e una
+       schermata di viaggio, quando il titolo si mette in moto il fluido e'
+       ancora al settanta per cento.
+
+       E il clone si rifiuta di accendersi finche' il fluido non ha finito —
+       giustamente, se no si vedrebbero due scritte diverse sovrapposte.
+       Quindi si accendeva a meta' strada, gia' rimpicciolito, con uno
+       scatto. Era uno dei difetti che si vedevano.
+
+       Il viaggio comincia percio' al piu' tardi fra i due: una schermata
+       prima dell'arrivo, oppure la fine dell'inchiostro. Se l'inchiostro
+       finisce tardi, il viaggio si accorcia e diventa piu' ripido — ed e'
+       la cosa giusta: meglio un viaggio breve che comincia dove deve, che
+       uno lungo che comincia prima di potersi vedere. */
+    var inizio = Math.max(fine - viaggio, fineInchiostro());
+    corsaViaggio = Math.max(1, fine - inizio);
+    return clamp01((y - inizio) / corsaViaggio);
   }
 
   /* ——— il viaggio ————————————————————————————————————————————————— */
@@ -540,6 +600,12 @@ function init(){
   var partenza = null;
   /* e dove va a posarsi, misurato a lettere ferme: vedi piazza() */
   var arrivo = null;
+  /* il bersaglio GEOMETRICO del viaggio, non quello smorzato: e' lui che dice
+     quanto scroll manca alla sezione per fermarsi. Vedi piazza(). */
+  var bGrezzo = 0;
+  /* di quanto la lettera sta sotto la scatola che la contiene, in multipli
+     del corpo. Si misura, non si calcola: vedi in fondo a piazza(). */
+  var sfalsoEm = 0;
 
   function vestiClone(){
     var cs = getComputedStyle(titolo);
@@ -657,14 +723,6 @@ function init(){
      ferme nello schermo e il titolo puo' inseguirle; quando il suo pilastro
      finisce se ne vanno su, e da li' in poi inseguirle vorrebbe dire curvare
      dietro a qualcosa che non si vede nemmeno piu'. */
-  /* La sezione e' arrivata al suo posto? Lo si chiede allo stick, che e'
-     quello che si incolla: finche' scorre, il suo bordo alto sta dove sta il
-     pilastro; quando si incolla resta a topIncollo mentre il pilastro
-     continua a salire, e i due si staccano. */
-  function incollata(){
-    return stick.getBoundingClientRect().top <= topIncollo + 0.5;
-  }
-
   function inkIncollato(){
     if(!pinInk) return false;
     var r = pinInk.getBoundingClientRect();
@@ -768,6 +826,7 @@ function init(){
     inkMis = null;
     partenza = null;
     arrivo = null;
+    sfalsoEm = 0;
     /* Qui sotto spezza() butta via le lettere del clone e ne fa di nuove: la
        timeline dello scambio punterebbe a nodi che non sono piu' in pagina.
        Si puo' buttare senza pensarci — a questo punto del viaggio il titolo
@@ -940,74 +999,56 @@ function init(){
 
        Ancorando invece al punto di lettura, quel punto scorre su una retta e
        il gioco del tracciamento resta tutto in coda, dove nessuno lo segue. */
-    /* ——— IL BERSAGLIO SI MISURA A LETTERE FERME —————————————————
-       Il bersaglio sono le lettere del titolo. Ma lo scambio LE MUOVE: le
-       porta al loro posto, le fa uscire in alto, le fa entrare dal basso. Se
-       il bersaglio si rileggesse mentre lo scambio sta girando, il titolo
-       inseguirebbe le lettere che lui stesso sta spostando — e infatti
-       nell'ultimo fotogramma del viaggio saltava di cinquanta pixel.
+    /* ——— DOVE SI POSA, senza prevedere niente ————————————————————
+       Il punto d'arrivo e' dove il titolo si trovera' a sezione ferma. Ci ho
+       provato in due modi, e sbagliavano tutti e due:
 
-       Quindi si misura solo quando sono ferme, e per il resto si tiene il
-       numero. Tanto e' una posizione A RIPOSO: non dipende dallo scroll, e
-       cambia solo se cambia il titolo o la finestra. */
+         - leggere il titolo ADESSO: e' giusto all'arrivo ma durante il
+           viaggio la sezione sta ancora salendo, quindi il bersaglio
+           scappa e la traiettoria diventa un arco;
+
+         - prevederlo da topIncollo: e' fermo, ma presuppone di sapere dove
+           si ferma la sezione. E non si sa. Fra il contenitore che si
+           incolla e il titolo, in pagina, c'e' .studio-info — posizionata
+           con top:50% e translateY(-50%), cioe' centrata in verticale.
+           Vuol dire che il titolo sta dove sta in funzione dell'ALTEZZA di
+           tutto il blocco: titolo piu' descrizione piu' bottone. E quella
+           altezza cambia a ogni opera, perche' cambia la descrizione.
+           Sbagliavo di settantatre pixel e non capivo da dove venissero.
+
+       Il terzo modo non prevede e non insegue: CONVERTE. Finche' la sezione
+       non si e' incollata scorre con la pagina, uno a uno con lo scroll. Al
+       bersaglio mancano (1 - b) viaggi di scroll, quindi il titolo scendera'
+       ancora di altrettanto:
+
+           dove sara' = dove e' adesso - (1 - b) * viaggio
+
+       Il risultato e' un punto FERMO nello schermo — perche' i due termini
+       si muovono insieme e si cancellano — ed e' ESATTO, perche' a b = 1 il
+       secondo termine e' zero e resta la misura pura. Niente topIncollo,
+       niente supposizioni su margini, scatole o centrature: se domani
+       cambia l'impaginazione della sezione, questo conto continua a
+       funzionare senza che nessuno lo aggiorni.
+
+       Si legge a lettere ferme: lo scambio le sposta, e il titolo e' il
+       bersaglio — rileggerlo mentre gira vorrebbe dire inseguire cio' che
+       si sta spostando da soli. */
     var ferme = !montata && (!tlScambio || !tlScambio.isActive());
     if(!arrivo || ferme){
-      /* ——— A CHE ALTEZZA SI POSA ——————————————————————————————
-         A riposo, chi sta a topIncollo e' il CONTENITORE che si incolla, non
-         la sezione: fra i due ci puo' stare un margine, e in pagina ce n'e'
-         uno. Misurando dalla sezione, la previsione sbagliava di quel
-         margine — settantatre pixel, misurati sul video: il titolo si posava
-         un rigo abbondante sotto il suo posto e le lettere nuove entravano
-         da un'altra altezza.
-
-         Si misura quindi dallo stick, che e' l'unico elemento di cui si sa
-         con certezza dove sta a riposo: ce lo mette position:sticky, per
-         definizione, al valore di top che gli abbiamo dato. Qualunque cosa
-         ci sia in mezzo finisce dentro lo scarto misurato.
-
-         E quando la sezione e' DAVVERO incollata non si prevede piu' niente:
-         si legge, e la lettura batte la previsione. Cosi' se un domani salta
-         fuori un altro margine, un altro bordo o un'altra scatola, il titolo
-         si posa lo stesso dove deve. */
-      var yRiposo;
-      if(incollata()) yRiposo = B.top;
-      else yRiposo = topIncollo + (B.top - stick.getBoundingClientRect().top);
-      arrivo = { anc: ancora(), x: 0, y: yRiposo };
+      arrivo = {
+        anc: ancora(),
+        x:   0,
+        /* la corsa VERA del viaggio, non VIAGGIO_VH: se l'inchiostro
+           finisce tardi il viaggio si accorcia, e lo scroll che manca va
+           contato su quella, se no il bersaglio si sposta. */
+        y:   B.top - (1 - bGrezzo) * corsaViaggio
+      };
       arrivo.x = B.left + arrivo.anc * B.width;
     }
     var anc = arrivo.anc;
     var cx0 = arrivo.x;
-
-    /* ——— IL BERSAGLIO STA FERMO ———————————————————————————————————
-       Qui c'era B.top, cioe' dove il titolo si trova ADESSO. Ed e' da li'
-       che veniva la curva.
-
-       Durante il viaggio la sezione studio non e' ancora incollata: sta
-       ancora salendo con lo scroll, un'intera schermata. Quindi il titolo
-       puntava a un bersaglio in movimento, e la somma di un rimpicciolimento
-       dritto e di un bersaglio che scappa non e' una retta — e' un arco.
-       Misurato: ottantaquattro pixel di pancia, e a meta' strada la scritta
-       tornava perfino indietro in su. Cambiare il modo di interpolare non
-       serviva a niente (l'ho provato: da 84 a 88), perche' il problema non
-       era l'interpolazione.
-
-       Adesso si punta a dove il titolo SARA' quando la sezione si sara'
-       fermata: il bordo alto della sezione a riposo e' topIncollo, e dentro
-       la sezione il titolo sta sempre alla stessa altezza. Due punti fermi
-       nello schermo, uno all'inizio e uno alla fine, e in mezzo una retta.
-       All'arrivo le due cose coincidono di nuovo, perche' li' la sezione e'
-       davvero ferma a topIncollo. */
     var cy0 = arrivo.y + centroMaiuscole(F, L);
-    /* E da dove parte: NON il centro dello schermo — il centro del canvas.
-       Sono la stessa cosa solo finche' il pilastro dell'inchiostro e'
-       incollato, e proprio nell'istante dello scambio puo' non esserlo piu':
-       lo scambio aspetta che il fluido sia a fondo corsa, che con la coda di
-       fabbrica cade sull'ultimo pixel della sezione — cioe' esattamente dove
-       il pilastro comincia a sfilarsi. Da li' in poi le lettere dipinte
-       salgono con lui e il clone resta fermo a meta' schermo: al banco sono
-       trenta pixel di scarto verticale. Si legge il riquadro vero, che e'
-       anche la definizione che usa chi dipinge (centrato in w/2, h/2 della
-       griglia, e la griglia sta a inset:0 nello stick). */
+
     /* ——— E ANCHE LA PARTENZA STA FERMA ——————————————————————————
        Stesso discorso del bersaglio, dall'altro capo. Il punto di partenza e'
        il canvas dell'inchiostro, che sta incollato — ma non per sempre: il
@@ -1063,8 +1104,31 @@ function init(){
     if(Math.abs(parseFloat(clone.style.fontSize) - Fq) > 0.05) clone.style.fontSize = Fq.toFixed(2) + 'px';
     if(Math.abs(parseFloat(clone.style.letterSpacing) / Fq - spQ) > 0.0005) clone.style.letterSpacing = spQ.toFixed(5) + 'em';
     clone.style.transform =
-      'translate3d(' + cx.toFixed(2) + 'px,' + cy.toFixed(2) + 'px,0)' +
+      'translate3d(' + cx.toFixed(2) + 'px,' + (cy - sfalsoEm * Fq).toFixed(2) + 'px,0)' +
       ' translate(' + (-anc * 100).toFixed(1) + '%,' + (-perno).toFixed(2) + 'px)';
+
+    /* ——— L'ULTIMO SCARTO, MISURATO ————————————————————————————————
+       Il conto qui sopra porta al suo posto il riquadro del CLONE. Ma il
+       bersaglio e' il riquadro delle LETTERE del titolo, e le due cose non
+       coincidono: dentro la riga c'e' l'interlinea, e la lettera sta piu'
+       in basso della scatola che la contiene. Al banco erano due pixel e
+       mezzo — pochi, ma costanti, e un difetto costante si vede.
+
+       Si potrebbe rifare il conto dell'interlinea. Ma e' esattamente il
+       genere di conto che sbaglia in silenzio quando qualcuno cambia una
+       regola: meglio misurarlo. Si legge di quanto la prima lettera del
+       clone sta sotto il clone, lo si tiene in multipli del corpo — cosi'
+       vale a ogni grandezza — e lo si toglie al fotogramma dopo.
+
+       Un fotogramma di ritardo, e solo il primo: da li' in poi e' a zero. */
+    if(cloneChars.length){
+      var rc = clone.getBoundingClientRect();
+      var rl = cloneChars[0].getBoundingClientRect();
+      if(rc.height && Fq > 0){
+        var e = (rl.top - rc.top) / Fq + sfalsoEm;
+        if(Math.abs(e - sfalsoEm) > 0.0005) sfalsoEm = e;
+      }
+    }
   }
 
   /* ——— LO SCAMBIO DELLE LETTERE ——————————————————————————————————
@@ -1215,8 +1279,17 @@ function init(){
 
      Da qui le due liste: roba() e' quello che svanisce, il titolo non c'e'
      dentro ed e' apposta. */
+  /* ——— COSA SVANISCE ——————————————————————————————————————————
+     Non .studio-info. Sembra la scelta ovvia — e' "il blocco di sinistra" —
+     ma il titolo STA DENTRO .studio-info, quindi spegnere quella spegne
+     anche lui. Ed e' il contrario di quel che serve: il titolo e' l'unica
+     cosa che non deve sparire mai.
+
+     Quindi si nominano i pezzi, uno per uno: la descrizione, il bottone, la
+     barra, il riquadro delle fotografie. Il titolo non e' nella lista, e non
+     ci deve finire. */
   function roba(){
-    return [info, pager, stage].filter(Boolean);
+    return [desc, cta, pager, stage].filter(Boolean);
   }
 
   function dissolvi(verso){
@@ -1303,6 +1376,7 @@ function init(){
     ultimo = t;
 
     var b = bersaglio();
+    bGrezzo = b;
 
     /* ——— IL VIAGGIO ASPETTA LE LETTERE ———————————————————————————
        Lo scambio va girato col titolo fermo al suo posto: e' li' che le
