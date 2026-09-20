@@ -147,19 +147,25 @@ var FILO_INK   = 0.06;  /* ——— IL FILO CHE ASSOTTIGLIA ——————�
                           compresso: se a occhio si vedesse ancora, e' questa
                           la manopola, e si gira di due centesimi.          */
 
-var USCITA_R   = 0.35; /* quanta TENUTA si tiene da parte per il ritorno del
-                          titolo, in frazione della riserva.
+var USCITA     = 0.45; /* secondi della dissolvenza, in uscita e in entrata.
+                          E' la stessa: sparire e riapparire sono lo stesso
+                          gesto letto nei due versi.                       */
 
-                          Ci deve stare tutto il riavvolgimento dello scambio
-                          — SCAMBIO_DUR piu' SCAMBIO_SPAZZATA, cioe' un
-                          secondo — mentre la sezione e' ancora incollata e
-                          il titolo ancora fermo al suo posto. A 0.35 di due
-                          schermate sono seicento pixel: a rotellata normale,
-                          piu' di un secondo.
+var USCITA_R   = 0.30; /* quanta TENUTA si tiene da parte per la dissolvenza,
+                          in frazione della riserva.
 
-                          Se lo scambio si allunga, questa va allungata con
-                          lui. Se no il viaggio comincia a lettere ancora per
-                          aria, ed e' il difetto che si vedeva risalendo.  */
+                          Tornando indietro, viaggio e tenuta si susseguono
+                          senza sovrapporsi: finche' si consuma la riserva il
+                          progresso resta a 1 e la sezione sta incollata, e
+                          appena scende sotto 1 si stacca e comincia a
+                          scorrere via. Senza questa fetta, dissolvenza e
+                          scorrimento partirebbero insieme, e quello che si
+                          vedrebbe sarebbe una sezione che se ne va — non una
+                          che svanisce.
+
+                          A 0.30 di due schermate sono cinquecento pixel: a
+                          rotellata normale, piu' dei quattro decimi di
+                          secondo che dura la dissolvenza.                 */
 
 var MIN_W      = 992;  /* sotto questa larghezza non si fa niente.          */
 
@@ -511,16 +517,14 @@ function init(){
   /* ——— il viaggio ————————————————————————————————————————————————— */
   var p = 0, armato = false, montata = false;
   var cloneChars = [], vivo = false, girando = false, ultimo = 0, primo = true;
-  /* Due timeline, due vite diverse. tlSezione gira una volta sola in tutta la
-     pagina — sezioneFatta se lo ricorda. tlScambio invece va avanti e
-     indietro, una volta per ogni passata del titolo. */
+  /* Le due timeline dell'arrivo: le righe della sezione e lo scambio delle
+     lettere. Girano una volta sola in tutta la vita della pagina — e
+     sezioneFatta se lo ricorda — perche' da li' in poi la sezione va e viene
+     in dissolvenza, e non c'e' piu' niente da mettere in scena. */
   var tlSezione = null, tlScambio = null, sezioneFatta = false;
   /* la fetta di tenuta si arma solo dopo esserne usciti; e usciti che si e',
      il montaggio resta chiuso. Vedi le due guardie in giro(). */
   var assestata = false, uscito = false;
-  /* le lettere del titolo per cui tlScambio e' stata costruita: se cambiano,
-     la timeline non vale piu' */
-  var firmaScambio = '';
   /* il punto da cui il titolo parte, congelato appena si stacca: vedi
      piazza(). Si azzera a ogni nuova misura, che e' quando puo' cambiare. */
   var partenza = null;
@@ -720,6 +724,10 @@ function init(){
 
   function arma(){
     if(armato) return;
+    /* Arrivati una volta, il clone ha finito il suo lavoro: la sezione da li'
+       in poi va e viene in dissolvenza, e una mega scritta che riparte in
+       mezzo sarebbe esattamente la coreografia che non si vuole piu'. */
+    if(sezioneFatta) return;
 
     /* Il velo e' bianco pieno e opaco. Se si accendesse mentre l'inchiostro
        sta ancora coprendo, sbiancherebbe di colpo gli angoli che il fluido
@@ -759,7 +767,6 @@ function init(){
        Si puo' buttare senza pensarci — a questo punto del viaggio il titolo
        e' all'inchiostro e lo scambio e' comunque a zero. */
     if(tlScambio){ tlScambio.kill(); tlScambio = null; }
-    firmaScambio = '';
     vestiClone();
     cloneChars = spezza(testoInk());
     clone.classList.add('is-on');
@@ -1189,62 +1196,52 @@ function init(){
     return tl;
   }
 
-  /* ——— il montaggio, UNA VOLTA SOLA —————————————————————————————
-     La coreografia della sezione — le righe a tendina, la barra che sale, il
-     velo che scivola via dalle fotografie, la cornice che si accende — e' un
-     arrivo. Un arrivo si fa una volta.
+  /* ——— L'ARRIVO SI FA UNA VOLTA SOLA ————————————————————————————
+     La coreografia — il titolo che arriva dall'inchiostro, le lettere che si
+     scambiano, le righe a tendina, la barra che sale, il velo che scivola via
+     dalle fotografie, la cornice che si accende — e' un arrivo. Un arrivo si
+     fa una volta, al primo scroll, e poi basta.
 
-     Prima si disfaceva e si rifaceva a ogni passata, e rivedere la stessa
-     entrata per la terza volta non la fa sembrare curata: la fa sembrare
-     bloccata. Adesso gira al primo scroll e poi la sezione resta com'e' per
-     il resto della vita della pagina.
+     Da li' in avanti la sezione si comporta come una sezione normale: si
+     risale e svanisce, si riscende e riappare. Una dissolvenza e basta, nei
+     due versi, senza rimettere in scena niente.
 
-     Quello che continua ad andare avanti e indietro e' il titolo, e basta:
-     e' lui il ponte fra le due sezioni, e deve poter tornare al suo posto in
-     cima se si risale. Da qui le due timeline separate — tlSezione, che gira
-     una volta e non si tocca piu', e tlScambio, che si riavvolge. */
+     Le due cose stanno in due funzioni separate apposta: chi legge deve
+     vedere subito che sono due gesti diversi e non due rami dello stesso. */
+
+  /* le quattro cose che si vedono nella sezione. La cornice sta dentro il
+     riquadro, quindi ci viene dietro da sola. */
+  function roba(){
+    return [guscio, info, pager, stage].filter(Boolean);
+  }
+
+  function dissolvi(verso){
+    var r = roba();
+    if(!r.length) return;
+    gsap.killTweensOf(r);
+    gsap.to(r, { opacity: verso, duration: USCITA, ease: 'power2.out', overwrite: 'auto' });
+  }
+
   function monta(){
     if(montata) return;
     montata = true;
 
+    if(sezioneFatta){ dissolvi(1); return; }
+
+    sezioneFatta = true;
     document.documentElement.classList.add('is-consegna');
     studio.sospendi();
 
-    var nuove = studio.lettere(), i, firma = '';
-    for(i = 0; i < nuove.length; i++) firma += lettera(nuove[i]);
+    if(tlScambio) tlScambio.kill();
+    tlScambio = scambio(cloneChars, studio.lettere());
+    tlScambio.eventCallback('onComplete', arrivato);
 
-    /* Se il titolo e' ancora quello di prima si RIPRENDE la stessa timeline
-       da dove la risalita l'aveva lasciata, invece di rifarla da capo.
-       Conta perche' cambiare idea a meta' e' la cosa piu' normale del mondo:
-       si risale di poco, le lettere sono a mezz'aria, si ridiscende. Rifarla
-       vorrebbe dire rimisurare dei rettangoli che in quell'istante sono
-       sballati dalle traslazioni in corso, e far saltare tutto di scatto.
-
-       Se invece l'opera e' cambiata sotto — l'autoplay gira — i posti sono
-       altri e la timeline va rifatta: la firma del titolo se ne accorge. */
-    if(tlScambio && firma === firmaScambio){
-      /* gia' arrivata in fondo: non c'e' niente da riprendere, ma il
-         carosello e la planata aspettano ancora il via */
-      if(tlScambio.progress() >= 1) scambiato();
-      else tlScambio.play();
-    } else {
-      if(tlScambio) tlScambio.kill();
-      firmaScambio = firma;
-      tlScambio = scambio(cloneChars, nuove);
-      tlScambio.eventCallback('onComplete', scambiato);
-      tlScambio.play(0);
-    }
-
-    if(sezioneFatta) return;
-
-    /* La sezione, solo la prima volta. La timeline si costruisce PRIMA di
-       scoprirla, e in pausa: costruirla applica gia' lo stato di partenza —
-       righe sotto il bordo, cornice spenta — quindi quando si alza il
-       sipario non c'e' nessun fotogramma con qualcosa al posto sbagliato. */
-    sezioneFatta = true;
+    /* La timeline della sezione si costruisce PRIMA di scoprirla, e in pausa:
+       costruirla applica gia' lo stato di partenza — righe sotto il bordo,
+       cornice spenta — quindi quando si alza il sipario non c'e' nessun
+       fotogramma con qualcosa al posto sbagliato. */
     if(tlSezione) tlSezione.kill();
     tlSezione = gsap.timeline({ paused: true });
-
     tlSezione.add(studio.entrataRighe(), 0);
     if(pagerLn) tlSezione.add(studio.tendina([pagerLn]), 0);
     gsap.set(coperta, { clearProps: 'opacity' });
@@ -1254,33 +1251,24 @@ function init(){
 
     sez.classList.remove('cnsg-attesa');
     tlSezione.play(0);
+    tlScambio.play(0);
   }
 
-  /* Titolo consegnato: la planata torna libera — qui la sezione e' incollata
-     al centro, quindi calcola una distanza di zero e non fa niente comunque —
-     e il carosello riprende a girare. */
-  function scambiato(){
-    document.documentElement.classList.remove('is-consegna');
+  /* Titolo consegnato. Da qui in poi il clone non serve piu': si spegne, e
+     con lui il velo bianco sull'inchiostro, che torna a mostrare le proprie
+     lettere. E' anche il motivo per cui arma() da adesso rifiuta di
+     riarmarsi — se no, risalendo, la mega scritta ripartirebbe. */
+  function arrivato(){
+    disarma();
     studio.riprendi();
   }
 
-  /* ——— e l'uscita, che adesso e' solo il titolo ————————————————————
-     Scrollando in su non svanisce piu' niente: la sezione resta esattamente
-     com'e', con le sue fotografie, le sue righe e la sua cornice. Torna
-     indietro il titolo, e ci torna riavvolgendo lo scambio — le lettere del
-     titolo se ne riscendono da dove erano venute, quelle dell'inchiostro
-     rientrano da sopra e si rimettono in fila. Poi il viaggio lo riporta in
-     cima, grande com'era.
-
-     Riavvolgere invece di rifare al contrario non e' un dettaglio: una
-     seconda animazione "di ritorno" sarebbe un secondo posto dove sbagliare
-     i numeri, e i due movimenti non combacerebbero mai del tutto. */
+  /* Risalendo: svanisce tutto. Non si riavvolge niente e non si rimette in
+     scena niente — e' una dissolvenza, come deve essere in uscita. */
   function smonta(){
     if(!montata) return;
     montata = false;
-    document.documentElement.classList.add('is-consegna');
-    studio.sospendi();
-    if(tlScambio) tlScambio.reverse();
+    dissolvi(0);
   }
 
   /* ——— il giro ————————————————————————————————————————————————————— */
