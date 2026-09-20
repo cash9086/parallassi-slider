@@ -119,7 +119,7 @@ var SCAMBIO_SALTO = 1.15; /* di quanto una lettera esce in alto e la sua
 var SCAMBIO_EASE = 'power3.inOut'; /* stessa curva per chi si sposta, chi
                           esce e chi entra: e' un movimento solo.          */
 
-var FILO_INK   = 0.1;  /* ——— IL FILO CHE ASSOTTIGLIA ————————————————
+var FILO_INK   = 0.06;  /* ——— IL FILO CHE ASSOTTIGLIA ————————————————
                           Le lettere dipinte dall'inchiostro escono un filo
                           piu' magre di quelle vere: passano per una maschera
                           e per una simulazione, e ci lasciano una frazione
@@ -132,10 +132,34 @@ var FILO_INK   = 0.1;  /* ——— IL FILO CHE ASSOTTIGLIA ——————�
                           d'inchiostro e perde man mano che rimpicciolisce:
                           mangia da fuori esattamente quello che la maschera
                           mangiava. A zero e' spento, e il valore si trova
-                          misurando — non a occhio: al banco 0.1 porta la
-                          differenza di area da +1.41% a -0.04%, e 0.2 la
-                          ribalta a -1.98%. Se in pagina si vedesse ancora, e'
-                          questa la manopola, e si gira di un decimo.       */
+                          misurando — non a occhio, e sulla PAGINA, non sul
+                          banco: li' l'inchiostro e' un canvas 2D e non il
+                          fluido vero, e la resa non e' la stessa.
+
+                          Il conto viene dal video. Senza filo, le lettere
+                          dipinte coprivano l'1.1% in piu' del clone; con il
+                          filo a 0.1 il clone e' finito lo 0.7% sotto. Cioe'
+                          un decimo di pixel vale circa l'1.8%, e per
+                          chiudere l'1.1% ne servono sei centesimi.
+
+                          Resta un margine di un mezzo per cento, che e'
+                          dentro il rumore di una misura fatta su un video
+                          compresso: se a occhio si vedesse ancora, e' questa
+                          la manopola, e si gira di due centesimi.          */
+
+var USCITA_R   = 0.35; /* quanta TENUTA si tiene da parte per il ritorno del
+                          titolo, in frazione della riserva.
+
+                          Ci deve stare tutto il riavvolgimento dello scambio
+                          — SCAMBIO_DUR piu' SCAMBIO_SPAZZATA, cioe' un
+                          secondo — mentre la sezione e' ancora incollata e
+                          il titolo ancora fermo al suo posto. A 0.35 di due
+                          schermate sono seicento pixel: a rotellata normale,
+                          piu' di un secondo.
+
+                          Se lo scambio si allunga, questa va allungata con
+                          lui. Se no il viaggio comincia a lettere ancora per
+                          aria, ed e' il difetto che si vedeva risalendo.  */
 
 var MIN_W      = 992;  /* sotto questa larghezza non si fa niente.          */
 
@@ -491,6 +515,9 @@ function init(){
      pagina — sezioneFatta se lo ricorda. tlScambio invece va avanti e
      indietro, una volta per ogni passata del titolo. */
   var tlSezione = null, tlScambio = null, sezioneFatta = false;
+  /* la fetta di tenuta si arma solo dopo esserne usciti; e usciti che si e',
+     il montaggio resta chiuso. Vedi le due guardie in giro(). */
+  var assestata = false, uscito = false;
   /* le lettere del titolo per cui tlScambio e' stata costruita: se cambiano,
      la timeline non vale piu' */
   var firmaScambio = '';
@@ -616,6 +643,14 @@ function init(){
      ferme nello schermo e il titolo puo' inseguirle; quando il suo pilastro
      finisce se ne vanno su, e da li' in poi inseguirle vorrebbe dire curvare
      dietro a qualcosa che non si vede nemmeno piu'. */
+  /* La sezione e' arrivata al suo posto? Lo si chiede allo stick, che e'
+     quello che si incolla: finche' scorre, il suo bordo alto sta dove sta il
+     pilastro; quando si incolla resta a topIncollo mentre il pilastro
+     continua a salire, e i due si staccano. */
+  function incollata(){
+    return stick.getBoundingClientRect().top <= topIncollo + 0.5;
+  }
+
   function inkIncollato(){
     if(!pinInk) return false;
     var r = pinInk.getBoundingClientRect();
@@ -904,11 +939,27 @@ function init(){
        cambia solo se cambia il titolo o la finestra. */
     var ferme = !montata && (!tlScambio || !tlScambio.isActive());
     if(!arrivo || ferme){
-      arrivo = {
-        anc: ancora(),
-        x:   0,
-        y:   topIncollo + (B.top - sez.getBoundingClientRect().top)
-      };
+      /* ——— A CHE ALTEZZA SI POSA ——————————————————————————————
+         A riposo, chi sta a topIncollo e' il CONTENITORE che si incolla, non
+         la sezione: fra i due ci puo' stare un margine, e in pagina ce n'e'
+         uno. Misurando dalla sezione, la previsione sbagliava di quel
+         margine — settantatre pixel, misurati sul video: il titolo si posava
+         un rigo abbondante sotto il suo posto e le lettere nuove entravano
+         da un'altra altezza.
+
+         Si misura quindi dallo stick, che e' l'unico elemento di cui si sa
+         con certezza dove sta a riposo: ce lo mette position:sticky, per
+         definizione, al valore di top che gli abbiamo dato. Qualunque cosa
+         ci sia in mezzo finisce dentro lo scarto misurato.
+
+         E quando la sezione e' DAVVERO incollata non si prevede piu' niente:
+         si legge, e la lettura batte la previsione. Cosi' se un domani salta
+         fuori un altro margine, un altro bordo o un'altra scatola, il titolo
+         si posa lo stesso dove deve. */
+      var yRiposo;
+      if(incollata()) yRiposo = B.top;
+      else yRiposo = topIncollo + (B.top - stick.getBoundingClientRect().top);
+      arrivo = { anc: ancora(), x: 0, y: yRiposo };
       arrivo.x = B.left + arrivo.anc * B.width;
     }
     var anc = arrivo.anc;
@@ -1241,6 +1292,19 @@ function init(){
 
     var b = bersaglio();
 
+    /* ——— IL VIAGGIO ASPETTA LE LETTERE ———————————————————————————
+       Lo scambio va girato col titolo fermo al suo posto: e' li' che le
+       lettere si scambiano, e se intanto la scritta vola via si vedono due
+       cose scollegate che si muovono ognuna per conto suo.
+
+       La fetta di tenuta basta a rotellata normale, ma non e' una garanzia:
+       una scrollata lanciata la consuma in meno di quanto duri lo scambio.
+       Questa riga la garanzia la da': finche' lo scambio gira, il viaggio
+       resta a fondo corsa, punto. Al peggio si vede il titolo stare fermo un
+       attimo piu' del dovuto mentre si scrolla — che e' esattamente cio' che
+       la tenuta e' li' a fare. */
+    if(tlScambio && tlScambio.isActive()) b = 1;
+
     /* Il primissimo fotogramma non insegue: ci si mette. Chi ricarica la
        pagina gia' dentro la sezione — o ci arriva con un'ancora — altrimenti
        vedrebbe il titolo partire dal centro dello schermo e volare al suo
@@ -1292,20 +1356,39 @@ function init(){
 
     if(armato) piazza(CURVA ? morbida(p) : p);
 
-    /* La soglia di smontaggio non e' 0.999 per non essere in balia di un
-       colpo di trackpad: sotto i 0.93 vuol dire che il titolo ha davvero
-       ricominciato a scendere, non che la rotella ha tremato.
+    /* ——— QUANDO SI RIAVVOLGE ————————————————————————————————————
+       Lo scambio delle lettere deve girare tutto mentre il titolo sta FERMO
+       al suo posto. In discesa e' automatico: il montaggio scatta a viaggio
+       finito e il titolo resta parcheggiato li' per tutta la tenuta.
 
-       Non c'e' piu' nessuna uscita anticipata dentro la tenuta. Ce n'era una
-       perche' l'uscita era una dissolvenza di tutta la sezione e doveva
-       finire prima che la sezione si staccasse: si teneva da parte una fetta
-       di riserva apposta. Adesso in uscita non svanisce niente — torna solo
-       il titolo, e torna durante il viaggio, che e' esattamente il tratto di
-       scroll in cui la sezione e' ancora incollata. Il problema non si pone
-       piu', e con lui se ne vanno la fetta, la guardia che la armava e
-       quella che impediva al montaggio di ripartirci sopra. */
-    if(p >= 0.9995) monta();
+       In salita no, e si vedeva. Legare il riavvolgimento a p voleva dire
+       farlo partire quando il viaggio era GIA' cominciato: le lettere del
+       titolo tornavano indietro verso un clone che nel frattempo era volato
+       via, e sullo schermo c'erano due scritte staccate di quattrocento
+       pixel che si muovevano ognuna per conto suo. E' il "parte
+       completamente a caso".
+
+       Quindi il riavvolgimento lo fa scattare la TENUTA: si consuma una
+       fetta di riserva mentre la sezione e' ancora incollata e il titolo
+       ancora fermo, lo scambio si chiude li' dentro, e solo dopo comincia il
+       viaggio. La fetta si arma solo dopo esserne usciti almeno una volta,
+       se no scatterebbe nell'istante stesso del montaggio.
+
+       'uscito' tiene chiuso il montaggio dopo l'uscita: il viaggio e' ancora
+       a fondo corsa — p vale 1 — quindi senza guardia si rimonterebbe al
+       fotogramma dopo. Si riapre rientrando nella tenuta o tornando al
+       viaggio. */
+    var r = inRiserva();
+    if(p <= 0.93 || r > USCITA_R + 0.12) uscito = false;
+    if(r > USCITA_R + 0.12) assestata = true;
+
+    /* La soglia di smontaggio non e' 0.999 per non essere in balia di un
+       colpo di trackpad: sotto 0.93 il titolo ha davvero ricominciato a
+       scendere, non e' la rotella che ha tremato. */
+    if(p >= 0.9995){ if(!uscito) monta(); }
     else if(p <= 0.93) smonta();
+
+    if(montata && assestata && r < USCITA_R){ uscito = true; smonta(); }
 
     requestAnimationFrame(giro);
   }
