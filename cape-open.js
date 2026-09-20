@@ -165,7 +165,7 @@
      da battere e' 0.14em: legato al corpo del carattere resta giusto anche
      quando il titolo cresce con la finestra. Se la misura non si puo' fare,
      si ripiega su una percentuale comunque piu' generosa. */
-  function giu(w){
+  function discesa(w){
     var h = 0, corpo = 0;
     try{
       var box = w.parentNode;
@@ -183,7 +183,7 @@
     sec.classList.add('is-armed');
     slitte.forEach(function(w){
       w.parentNode.classList.add('is-armed');
-      w.style.transform = 'translateY(' + giu(w) + ')';
+      w.style.transform = 'translateY(' + discesa(w) + ')';
     });
   }
   function gioca(){
@@ -192,7 +192,7 @@
     var resta = slitte.length;
     slitte.forEach(function(w, i){
       var a = w.animate(
-        [{ transform:'translateY(' + giu(w) + ')' }, { transform:'translateY(0)' }],
+        [{ transform:'translateY(' + discesa(w) + ')' }, { transform:'translateY(0)' }],
         { duration:DUR, delay:i * STAGGER, easing:EASE, fill:'both' }
       );
       corse.push(a);
