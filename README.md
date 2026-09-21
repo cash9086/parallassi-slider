@@ -370,7 +370,10 @@ parte. Era questo il residuo che si vedeva.
 3. Arrivati in fondo alla riserva, se il montaggio sta ancora girando la
    sezione ti **trattiene**: lo scroll si ferma lì finché l'ultima animazione
    non ha finito, poi riparte.
-4. **Una volta sola**, in tutta la vita della pagina. Da lì in poi si risale e
+4. Finito il montaggio la riserva **si sgancia**: la scatola torna alta quanto
+   la sezione, la sezione smette di essere incollata, e da lì in poi appena
+   scrolli se ne va. Vedi *Lo sgancio* qui sotto.
+5. **Una volta sola**, in tutta la vita della pagina. Da lì in poi si risale e
    si riscende senza che succeda niente, e il carosello gira all'infinito per
    conto suo.
 
@@ -381,12 +384,31 @@ I gesti sono tutti del carosello — `capeStudio.tendina`, `entrataRighe`,
 cambia la durata di una tendina nel blocco `IMPOSTAZIONI` del carosello, cambia
 anche qui senza che nessuno se ne debba ricordare.
 
+### Lo sgancio
+
+La riserva è **altezza**, non uno stato: serve a tenere la sezione incollata
+mentre si monta. A montaggio fatto diventa scroll a vuoto — arrivi in fondo con
+lo slider acceso e tutto al suo posto, e devi ancora spingere per un pezzo prima
+che la sezione si muova. Quindi si toglie: la scatola torna alta quanto la
+sezione e la sezione torna nel flusso.
+
+Togliere altezza a una pagina sotto a chi la sta guardando fa saltare tutto in
+su. Di quanto, però, si sa esattamente: **tanto quanto la riserva già
+consumata**. Si toglie quello allo scroll e la sezione resta dov'è, al pixel.
+Vale mentre è ancora incollata, e vale anche se nel frattempo si è staccata e se
+ne sta andando. Quello che sta *sotto* la sezione si sposta per davvero, ma sta
+sotto il bordo basso dello schermo: la sezione è alta quanto la finestra e anche
+di più.
+
+Lo scroll lo muove `capeScroll` a livello `CORREZIONE` — è precisamente il caso
+per cui quel livello esiste.
+
 ### La tenuta
 
 È lo stesso `trattieni()` dell'intro — una riserva che si consuma stando fermi
 — con una differenza che qui è obbligata. Fra `SOGLIA` e il fondo della riserva
-c'è un decimo di schermata, un centinaio di pixel, e il montaggio dura poco più
-di un secondo: una rotellata normale se lo mangia. Quindi la riserva non basta,
+ci sono tre decimi di schermata, e il montaggio dura poco più di un secondo:
+una rotellata normale se li mangia. Quindi la riserva non basta,
 e arrivati in fondo si prende il volante (`capeScroll`, a livello `MURO`) e si
 ferma davvero, finché la timeline non chiama.
 
@@ -399,7 +421,7 @@ prima.
 | Manopola | Default | Cosa fa |
 |---|---|---|
 | `ATTESA_VH` | `1.00` | schermate di scroll bianco. È l'unico scroll che questa entrata **aggiunge** alla pagina, e resta lì anche dopo: è altezza, non uno stato |
-| `SOGLIA` | `0.90` | a che punto della riserva parte tutto |
+| `SOGLIA` | `0.70` | quanta riserva si consuma bianchi prima che parta tutto |
 | `EDGE_AT` / `EDGE_DUR` | `0.35` / `0.60` | quando compare la cornice del riquadro, e quanto ci mette. Non a zero: prima deve essersi mosso il velo |
 | `RETE_MS` | `2200` | la rete della tenuta. Sta sotto la scadenza di `capeScroll` (2500), così a mollare siamo noi |
 

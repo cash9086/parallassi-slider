@@ -30,9 +30,13 @@
       basta la riserva, perche' il montaggio dura un tempo suo e una rotellata
       lanciata se la mangia. Quindi al fondo della riserva si prende il
       volante e si ferma davvero.
-   4. Una volta sola, in tutta la vita della pagina. Da li' in poi la sezione
-      e' una sezione come le altre: si risale, si riscende, non succede piu'
-      niente e il carosello gira all'infinito per conto suo.
+   4. Finito il montaggio la riserva SI SGANCIA: la scatola alta torna alta
+      quanto la sezione, la sezione smette di essere incollata, e da li' in
+      poi appena scrolli se ne va. Non resta un tratto morto da consumare da
+      fermi: quello serviva a tenere ferma la sezione mentre si montava, e a
+      montaggio fatto e' solo scroll a vuoto.
+   5. Una volta sola, in tutta la vita della pagina. Si risale, si riscende,
+      non succede piu' niente e il carosello gira all'infinito per conto suo.
 
    NON ANIMA NIENTE DA SOLO
    ------------------------
@@ -62,10 +66,11 @@ var ATTESA_VH = 1.00;  /* LA RISERVA — schermate di scroll in cui la sezione
                           si allunga; sotto 0.6 la soglia arriva addosso
                           all'ingresso e l'attesa non si legge piu'.        */
 
-var SOGLIA    = 0.90;  /* 0..1 — a che punto della riserva parte tutto. A
-                          0.90 resta un decimo di schermata fra la partenza
-                          e il fondo: quel decimo e' il motivo per cui la
-                          tenuta qui sotto serve quasi sempre.              */
+var SOGLIA    = 0.70;  /* 0..1 — quanta riserva si consuma bianchi prima
+                          che parta tutto. A 0.70 restano tre decimi di
+                          schermata fra la partenza e il fondo: non bastano
+                          comunque a far finire il montaggio, ed e' il
+                          motivo per cui la tenuta qui sotto serve.         */
 
 var EDGE_AT   = 0.35;  /* secondi dopo la partenza in cui compare la cornice
                           del riquadro. Non a zero: prima deve essersi mosso
@@ -259,9 +264,15 @@ function init(){
 
   /* ── le misure ─────────────────────────────────────────────────────── */
 
-  var topIncollo = 0, riserva = 0;
+  var topIncollo = 0, riserva = 0, sganciata = false;
 
   function misura(){
+    /* Sganciata, non c'e' piu' niente da misurare: la scatola e' alta quanto
+       la sezione e la sezione sta nel flusso come tutte le altre. Rimisurare
+       vorrebbe dire rimetterle addosso la riserva che le abbiamo appena
+       tolto — e lo farebbe al primo ridimensionamento, senza dire niente. */
+    if(sganciata) return;
+
     var h = sez.offsetHeight || window.innerHeight;
     if(window.innerWidth < MIN_W){ pin.style.height = ''; stick.style.height = ''; return; }
 
@@ -340,8 +351,57 @@ function init(){
     gsap.set(titolo, { clearProps: 'transform' });
     document.documentElement.classList.remove(FERMA_PLANATA);
 
+    sgancia();
     molla();
     studio.riprendi();
+  }
+
+  /* ——— lo sgancio ————————————————————————————————————————————————————
+     La riserva e' altezza: serve a tenere la sezione incollata mentre si
+     monta, e a montaggio fatto diventa scroll a vuoto — arrivi in fondo con
+     lo slider acceso e devi ancora spingere per un pezzo prima che la
+     sezione si muova. Quindi si toglie.
+
+     Togliere altezza a una pagina sotto a chi la sta guardando fa saltare
+     tutto in su. Ma di quanto, si sa esattamente: tanto quanto la riserva
+     gia' consumata. Si toglie quello allo scroll e la sezione resta dov'e',
+     al pixel — vale mentre e' ancora incollata, e vale anche se nel
+     frattempo si e' staccata e se ne sta andando, perche' li' si e' spostata
+     in giu' esattamente della riserva intera.
+
+     Quello che sta SOTTO la sezione si sposta per davvero, ma sta sotto il
+     bordo basso dello schermo: la sezione e' alta quanto la finestra e anche
+     di piu'. Non lo vede nessuno.
+
+     Lo scroll lo muove il volante, a livello CORREZIONE: e' proprio il caso
+     per cui quel livello esiste — la pagina si e' accorciata, lo scroll DEVE
+     seguirla, e nessuno ha il diritto di interrompere. */
+  function sgancia(){
+    if(sganciata) return;
+
+    var y = window.scrollY || window.pageYOffset;
+    var naturale = pin.getBoundingClientRect().top + y;
+    var consumato = Math.max(0, Math.min(riserva, y - (naturale - topIncollo)));
+
+    sganciata = true;
+    riserva = 0;
+
+    pin.style.height     = '';
+    stick.style.position = 'static';
+    stick.style.top      = '';
+    stick.style.height   = '';
+
+    /* Lenis tiene una sua copia dell'altezza del documento e la rilegge per
+       conto suo, ma non in questo fotogramma: senza questa riga lo scroll a
+       cui lo mandiamo qui sotto verrebbe tagliato sul fondo vecchio. E'
+       l'unica riga di questo file che tocca Lenis direttamente, e tocca
+       perche' non c'e' un modo di chiederlo al volante. */
+    try{ if(window.lenis && window.lenis.resize) window.lenis.resize(); }catch(e){}
+
+    if(consumato < 1) return;
+    if(!window.capeScroll) return;
+    if(!capeScroll.prendi(VOLANTE, capeScroll.CORREZIONE)) return;
+    capeScroll.vaA(VOLANTE, Math.max(0, y - consumato), { immediate: true });
   }
 
   /* Il montaggio a fondo corsa, subito. La chiama chi sa che il momento e'
@@ -400,11 +460,14 @@ function init(){
     reteT = setTimeout(chiudi, RETE_MS);
   }
 
+  /* Si molla sempre, anche se non stavamo tenendo: il volante lo prende
+     anche lo sgancio, per la correzione, e capeScroll.molla() su un volante
+     che non e' tuo non fa niente. Un ramo che esce prima lascerebbe la
+     pagina in mano a noi fino alla scadenza. */
   function molla(){
     clearTimeout(reteT);
     reteT = null;
     tenutaSpesa = true;
-    if(!tenendo) return;
     tenendo = false;
     if(window.capeScroll) capeScroll.molla(VOLANTE);
   }
