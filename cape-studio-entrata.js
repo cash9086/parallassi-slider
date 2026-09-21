@@ -66,11 +66,20 @@ var ATTESA_VH = 1.00;  /* LA RISERVA — schermate di scroll in cui la sezione
                           si allunga; sotto 0.6 la soglia arriva addosso
                           all'ingresso e l'attesa non si legge piu'.        */
 
-var SOGLIA    = 0.70;  /* 0..1 — quanta riserva si consuma bianchi prima
-                          che parta tutto. A 0.70 restano tre decimi di
-                          schermata fra la partenza e il fondo: non bastano
-                          comunque a far finire il montaggio, ed e' il
-                          motivo per cui la tenuta qui sotto serve.         */
+var SOGLIA    = 0.30;  /* 0..1 — quanta riserva si consuma bianchi prima
+                          che parta tutto. A 0.30 il bianco dura tre decimi
+                          di schermata e poi parte: e' un'anticipazione, non
+                          un'attesa.
+
+                          Da qui in giu' cambia anche chi comanda la fine.
+                          Sopra il mezzo era quasi sempre la tenuta: si
+                          arrivava in fondo alla riserva col montaggio
+                          ancora in corso, e lo sgancio trovava la riserva
+                          tutta consumata. A 0.30 restano sette decimi di
+                          schermata dopo la partenza, e scrollando piano il
+                          montaggio finisce PRIMA del fondo: si sgancia con
+                          della riserva ancora da consumare. Vedi sgancia(),
+                          che e' il posto dove questo si paga.              */
 
 var EDGE_AT   = 0.35;  /* secondi dopo la partenza in cui compare la cornice
                           del riquadro. Non a zero: prima deve essersi mosso
@@ -369,9 +378,17 @@ function init(){
      frattempo si e' staccata e se ne sta andando, perche' li' si e' spostata
      in giu' esattamente della riserva intera.
 
-     Quello che sta SOTTO la sezione si sposta per davvero, ma sta sotto il
-     bordo basso dello schermo: la sezione e' alta quanto la finestra e anche
-     di piu'. Non lo vede nessuno.
+     Quello che sta SOTTO la sezione si sposta per davvero: si alza di
+     quanta riserva era rimasta da consumare. Finche' il montaggio finisce in
+     fondo alla riserva non ne resta, e il conto e' zero. Piu' SOGLIA e'
+     bassa, piu' capita di sganciare con della riserva ancora avanzata.
+
+     Quanto se ne vede: la sezione e' alta 52vw (45.4 sopra i 1920), cioe'
+     un filo meno di uno schermo, e si incolla centrata — quindi sotto di lei
+     resta una striscia di una ventina di pixel sul bordo basso. E' li', e
+     solo li', che si vede qualcosa: quella striscia passa dal fondo della
+     pagina alla cima della sezione dopo. Non si sposta niente di quello che
+     stai guardando.
 
      Lo scroll lo muove il volante, a livello CORREZIONE: e' proprio il caso
      per cui quel livello esiste — la pagina si e' accorciata, lo scroll DEVE
@@ -417,11 +434,14 @@ function init(){
   }
 
   /* ── trattieni() ───────────────────────────────────────────────────────
-     La riserva da sola non basta. Fra la soglia e il fondo c'e' un decimo
-     di schermata — un centinaio di pixel — e il montaggio dura poco piu' di
-     un secondo: una rotellata normale se lo mangia. Quindi arrivati in
-     fondo, se non ha ancora finito, si prende il volante e si ferma
-     davvero.
+     La riserva da sola non basta. Il montaggio dura poco piu' di un
+     secondo e una scrollata lanciata attraversa la riserva in molto meno:
+     arrivati in fondo, se non ha ancora finito, si prende il volante e si
+     ferma davvero.
+
+     Con SOGLIA bassa questo capita solo a chi corre — chi scrolla piano
+     arriva in fondo a montaggio gia' finito e non lo vede nemmeno. Va bene
+     cosi': e' una rete, non una tappa.
 
      Si prende a livello MURO e non SNAP: questo non e' una planata a cui si
      puo' rinunciare, e a quel livello la planata dello studio non puo'

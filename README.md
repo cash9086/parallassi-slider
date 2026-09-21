@@ -396,9 +396,16 @@ Togliere altezza a una pagina sotto a chi la sta guardando fa saltare tutto in
 su. Di quanto, però, si sa esattamente: **tanto quanto la riserva già
 consumata**. Si toglie quello allo scroll e la sezione resta dov'è, al pixel.
 Vale mentre è ancora incollata, e vale anche se nel frattempo si è staccata e se
-ne sta andando. Quello che sta *sotto* la sezione si sposta per davvero, ma sta
-sotto il bordo basso dello schermo: la sezione è alta quanto la finestra e anche
-di più.
+ne sta andando.
+
+Quello che sta *sotto* la sezione invece si sposta: si alza di quanta riserva
+era rimasta da consumare. Con `SOGLIA` alta non ne resta — si arriva in fondo
+col montaggio ancora in corso — e il conto è zero. Con `SOGLIA` bassa capita di
+sganciare in anticipo, e allora c'è qualcosa da vedere: la sezione è alta 52vw
+(45.4 sopra i 1920), cioè un filo meno di uno schermo, e incollata al centro
+lascia una striscia di una ventina di pixel sul bordo basso. È lì, e solo lì,
+che quel salto si legge — la striscia passa dal fondo della pagina alla cima
+della sezione dopo.
 
 Lo scroll lo muove `capeScroll` a livello `CORREZIONE` — è precisamente il caso
 per cui quel livello esiste.
@@ -406,9 +413,8 @@ per cui quel livello esiste.
 ### La tenuta
 
 È lo stesso `trattieni()` dell'intro — una riserva che si consuma stando fermi
-— con una differenza che qui è obbligata. Fra `SOGLIA` e il fondo della riserva
-ci sono tre decimi di schermata, e il montaggio dura poco più di un secondo:
-una rotellata normale se li mangia. Quindi la riserva non basta,
+— con una differenza che qui è obbligata. Il montaggio dura poco più di un secondo e una
+scrollata lanciata attraversa la riserva in molto meno. Quindi la riserva non basta,
 e arrivati in fondo si prende il volante (`capeScroll`, a livello `MURO`) e si
 ferma davvero, finché la timeline non chiama.
 
@@ -421,7 +427,7 @@ prima.
 | Manopola | Default | Cosa fa |
 |---|---|---|
 | `ATTESA_VH` | `1.00` | schermate di scroll bianco. È l'unico scroll che questa entrata **aggiunge** alla pagina, e resta lì anche dopo: è altezza, non uno stato |
-| `SOGLIA` | `0.70` | quanta riserva si consuma bianchi prima che parta tutto |
+| `SOGLIA` | `0.30` | quanta riserva si consuma bianchi prima che parta tutto |
 | `EDGE_AT` / `EDGE_DUR` | `0.35` / `0.60` | quando compare la cornice del riquadro, e quanto ci mette. Non a zero: prima deve essersi mosso il velo |
 | `RETE_MS` | `2200` | la rete della tenuta. Sta sotto la scadenza di `capeScroll` (2500), così a mollare siamo noi |
 
