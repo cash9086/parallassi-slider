@@ -8,12 +8,13 @@ custom code della pagina, perché là lo spazio è finito.
 | `reel-salita.js` | la sezione reel: la tenuta e la salita | ~16 KB |
 | `cape-open.js` | la sezione `.cape-open`: la tendina del video e le righe del titolo | ~6 KB |
 | `camera-oscura.js` | la sezione `.stage-wrap`: bruciatura, frase, firma, sviluppo, ritiro | ~21 KB |
+| `cape-studio-entrata.js` | la sezione studio: bianca, poi tutto insieme, una volta sola | ~15 KB |
 
 `reel-salita.js` e `cape-open.js` non hanno dipendenze — niente GSAP, niente
-jQuery. `camera-oscura.js` invece vuole GSAP e ScrollTrigger già caricati, ed è
-l'unico. Ognuno controlla da solo se la sua sezione è in pagina, e se non c'è
-esce subito senza costare niente. Sono indipendenti: nessuno dei tre sa degli
-altri.
+jQuery. `camera-oscura.js` vuole GSAP e ScrollTrigger già caricati.
+`cape-studio-entrata.js` vuole GSAP e `cape-studio-carousel.js`, e va caricato
+**dopo** di lui. Ognuno controlla da solo se la sua sezione è in pagina, e se
+non c'è esce subito senza costare niente.
 
 ---
 
@@ -341,3 +342,82 @@ casa migliore, si spostano da soli senza toccare il resto.
 Non una versione lenta della stessa cosa: un'altra cosa. Niente bruciatura,
 niente deriva, niente sviluppo — solo dissolvenze brevi, e la corsa lunga un
 terzo.
+
+---
+
+## `cape-studio-entrata.js`
+
+L'entrata della sezione studio. Prende il posto di `cape-studio-consegna.js`,
+che faceva un'altra cosa: il titolo della sezione a inchiostro — *ART AND
+FASHION* — viaggiava dal centro dello schermo fino al titolo del carosello e lì
+si scambiava lettera per lettera.
+
+L'inchiostro dalla pagina non c'è più. E quel file, non trovando più il titolo
+da cui partire, ripiegava sulla stringa scritta dentro di sé: continuava a far
+volare *ART AND FASHION* per una sezione che non lo diceva più da nessuna
+parte. Era questo il residuo che si vedeva.
+
+### Cosa succede
+
+1. La sezione si incolla al centro dello schermo ed è **bianca**: titolo,
+   descrizione, bottone, fotografie e barra ci sono tutti — misurabili,
+   impaginati — ma spenti. Dietro di lei si apre la riserva: una schermata di
+   scroll in cui non si muove niente.
+2. Consumata la riserva per `SOGLIA`, **parte tutto insieme**: il titolo sale
+   da dietro il proprio bordo, le righe di testo e il bottone anche, la barra
+   del carosello pure, e il velo bianco sulle fotografie se ne va con la
+   scivolata inclinata con cui entra un'immagine nuova.
+3. Arrivati in fondo alla riserva, se il montaggio sta ancora girando la
+   sezione ti **trattiene**: lo scroll si ferma lì finché l'ultima animazione
+   non ha finito, poi riparte.
+4. **Una volta sola**, in tutta la vita della pagina. Da lì in poi si risale e
+   si riscende senza che succeda niente, e il carosello gira all'infinito per
+   conto suo.
+
+### Non anima niente da solo
+
+I gesti sono tutti del carosello — `capeStudio.tendina`, `entrataRighe`,
+`sfoglia` — e lì restano. Qui si decide **quando**, non **come**: se domani
+cambia la durata di una tendina nel blocco `IMPOSTAZIONI` del carosello, cambia
+anche qui senza che nessuno se ne debba ricordare.
+
+### La tenuta
+
+È lo stesso `trattieni()` dell'intro — una riserva che si consuma stando fermi
+— con una differenza che qui è obbligata. Fra `SOGLIA` e il fondo della riserva
+c'è un decimo di schermata, un centinaio di pixel, e il montaggio dura poco più
+di un secondo: una rotellata normale se lo mangia. Quindi la riserva non basta,
+e arrivati in fondo si prende il volante (`capeScroll`, a livello `MURO`) e si
+ferma davvero, finché la timeline non chiama.
+
+Senza `capeScroll` in pagina la tenuta non c'è e tutto il resto regge: al
+peggio la sezione se ne va con il montaggio a metà, che è quello che succedeva
+prima.
+
+### Le manopole
+
+| Manopola | Default | Cosa fa |
+|---|---|---|
+| `ATTESA_VH` | `1.00` | schermate di scroll bianco. È l'unico scroll che questa entrata **aggiunge** alla pagina, e resta lì anche dopo: è altezza, non uno stato |
+| `SOGLIA` | `0.90` | a che punto della riserva parte tutto |
+| `EDGE_AT` / `EDGE_DUR` | `0.35` / `0.60` | quando compare la cornice del riquadro, e quanto ci mette. Non a zero: prima deve essersi mosso il velo |
+| `RETE_MS` | `2200` | la rete della tenuta. Sta sotto la scadenza di `capeScroll` (2500), così a mollare siamo noi |
+
+### Il markup che si aspetta
+
+Quello che c'è già nel Designer, più i gesti del carosello.
+
+| Selettore | Obbligatorio | A cosa serve |
+|---|---|---|
+| `.studio-hero` | sì | la sezione. Riceve `.stde-sez` e, durante l'attesa, `.stde-attesa` |
+| `.studio-headline__row` | sì | il titolo, che sale a tendina. Il suo guscio `.studio-headline` fa da finestra |
+| `.studio-stage` | sì | il palco. Ci viene appeso il velo bianco |
+| `.studio-stage__edge` | no | la cornice del riquadro |
+| `.studio-pager` | no | la barra, che sale con la stessa tendina |
+
+### Una classe che si chiama ancora `is-consegna`
+
+Mentre il montaggio gira, sul tag `html` compare `is-consegna`: è così che la
+planata dello studio — che sta nel custom code della pagina — sa di dover stare
+ferma. Il nome è quello vecchio apposta: rinominarla vorrebbe dire andare a
+cambiare una riga là dentro a mano per non guadagnare niente.
