@@ -1452,7 +1452,32 @@ function init(){
     document.documentElement.classList.add('is-consegna');
     studio.sospendi();
     dissolvi(0);
-    if(tlScambio) tlScambio.reverse();
+
+    /* ——— IL TITOLO PUO' NON ESSERE PIU' QUELLO —————————————————
+       Durante la tenuta il carosello gira: a fine montaggio lo faccio
+       riprendere io. Quindi l'opera puo' essere cambiata, e con lei le
+       lettere del titolo — nodi nuovi, quelli vecchi buttati.
+
+       La timeline dello scambio punta ai vecchi. Riavvolgerla non spegne
+       niente, e il clone torna su SOPRA il titolo nuovo rimasto acceso.
+       Misurato sulla pagina vera, scendendo e risalendo a rotella:
+       quarantotto fotogrammi con due scritte, per tutta la risalita.
+
+       La firma la controllavo al montaggio e mai allo smontaggio. Adesso si
+       controlla anche qui: se non torna, lo scambio si rifa' sul titolo di
+       adesso e lo si porta a fine corsa — che e' lo stato in cui la sezione
+       si trova davvero — e da li' si riavvolge. */
+    var nuove = studio.lettere(), i, firma = '';
+    for(i = 0; i < nuove.length; i++) firma += lettera(nuove[i]);
+
+    if(!tlScambio || firma !== firmaScambio){
+      if(tlScambio) tlScambio.kill();
+      firmaScambio = firma;
+      tlScambio = scambio(cloneChars, nuove);
+      tlScambio.eventCallback('onComplete', arrivato);
+      tlScambio.progress(1);
+    }
+    tlScambio.reverse();
   }
 
   /* ——— il giro ————————————————————————————————————————————————————— */
