@@ -174,6 +174,17 @@ var USCITA_R   = 0.35; /* quanta TENUTA si tiene da parte per l'uscita,
                           Se lo scambio si allunga, questa va allungata con
                           lui.                                             */
 
+var PAZIENZA   = 1200; /* millisecondi che il montaggio aspetta il titolo.
+
+                          Il montaggio ha senso solo se il titolo puo'
+                          arrivare dall'inchiostro. Se arriva prima lui, lo
+                          scambio nasce senza lettere di partenza, e da li'
+                          in poi ogni cosa che ci si appoggia e' sbagliata.
+
+                          Ma non si aspetta per sempre: se l'inchiostro su
+                          questa macchina non parte proprio, meglio una
+                          sezione normale che una sezione mai accesa.     */
+
 var MIN_W      = 992;  /* sotto questa larghezza non si fa niente.          */
 
 /* ——— le due scelte di aspetto ————————————————————————————————————
@@ -589,6 +600,8 @@ function init(){
      sezioneFatta se lo ricorda — perche' da li' in poi la sezione va e viene
      in dissolvenza, e non c'e' piu' niente da mettere in scena. */
   var tlSezione = null, tlScambio = null, sezioneFatta = false;
+  /* da quando il montaggio sta aspettando il titolo: vedi monta() */
+  var attesaMonta = 0;
   /* le lettere del titolo per cui tlScambio e' stata costruita: se l'opera
      sotto cambia, i posti sono altri e la timeline non vale piu' */
   var firmaScambio = '';
@@ -793,6 +806,23 @@ function init(){
   function arma(){
     if(armato) return;
 
+    /* ——— NON CI SI ARMA SOPRA UNA SEZIONE GIA' MONTATA —————————
+       Armarsi vuol dire tre cose: buttare la timeline dello scambio,
+       rifare le lettere del clone tutte visibili, e accendere il clone. Se
+       succede mentre il titolo dell'opera e' al suo posto e acceso, il
+       risultato e' due scritte sovrapposte nello stesso punto — ART AND
+       FASHION sopra il titolo — e per giunta lo scambio distrutto, cosi'
+       che risalendo non c'e' piu' niente da riavvolgere.
+
+       Misurato sulla pagina vera, risalendo: il clone passava da spento a
+       tredici lettere accese in un fotogramma, col titolo ancora a sedici.
+       Cinquantasei pixel di corpo comparsi dal nulla.
+
+       Il clone serve solo mentre il titolo VIAGGIA. A sezione montata il
+       titolo sta fermo al suo posto e non c'e' niente da mostrare; e
+       mentre lo scambio sta girando, le lettere sono sue e non si toccano. */
+    if(montata) return;
+
     /* Il velo e' bianco pieno e opaco. Se si accendesse mentre l'inchiostro
        sta ancora coprendo, sbiancherebbe di colpo gli angoli che il fluido
        non ha raggiunto — che sono scuri, non bianchi. Su uno schermo alto e
@@ -827,10 +857,27 @@ function init(){
     partenza = null;
     arrivo = null;
     sfalsoEm = 0;
-    /* Qui sotto spezza() butta via le lettere del clone e ne fa di nuove: la
-       timeline dello scambio punterebbe a nodi che non sono piu' in pagina.
-       Si puo' buttare senza pensarci — a questo punto del viaggio il titolo
-       e' all'inchiostro e lo scambio e' comunque a zero. */
+    /* ——— LE LETTERE SI RIFANNO SOLO SE NON SONO DI NESSUNO ————
+       spezza() butta via le lettere del clone e ne fa di nuove. Se lo
+       scambio e' ancora vivo, quelle lettere sono SUE: rifarle vuol dire
+       lasciargli in mano dei nodi che non sono piu' in pagina, e allora
+       risalendo non torna piu' niente.
+
+       C'e' anche il verso opposto dello stesso errore. Rifiutandosi di
+       accendere il clone finche' lo scambio gira, restano due fotogrammi in
+       cui il titolo se n'e' gia' andato e il clone non c'e' ancora: lo
+       schermo senza nessuna scritta. Misurato.
+
+       La cosa giusta non e' aspettare ne' rifare: e' accendere il clone e
+       basta, e lasciare che sia il riavvolgimento a riportare dentro le
+       lettere mentre quelle del titolo escono. Sono due meta' dello stesso
+       gesto, e devono succedere insieme. */
+    if(tlScambio && cloneChars.length){
+      clone.classList.add('is-on');
+      if(velo) velo.classList.add('is-on');
+      return;
+    }
+
     if(tlScambio){ tlScambio.kill(); tlScambio = null; }
     vestiClone();
     cloneChars = spezza(testoInk());
@@ -1301,10 +1348,42 @@ function init(){
 
   function monta(){
     if(montata) return;
+
+    /* ——— SENZA TITOLO NON C'E' CONSEGNA ————————————————————————
+       Qui sta la radice di una fila di difetti che ho curato uno per uno
+       senza mai toccarla.
+
+       Il montaggio scattava appena il viaggio era a fondo corsa, e basta.
+       Ma se lo scroll arriva veloce l'inchiostro e' ancora indietro, arma()
+       rifiuta — giustamente, se no si vedrebbero due scritte diverse
+       sovrapposte — e il clone non esiste. Montando lo stesso, lo scambio
+       nasceva con ZERO lettere di partenza: riavvolgerlo non riportava
+       indietro niente, e il clone che si armava dopo si sovrapponeva al
+       titolo rimasto acceso. Misurato sulla pagina vera: ventisette
+       fotogrammi con due scritte.
+
+       Adesso il montaggio aspetta. Non per sempre: dopo PAZIENZA si monta
+       comunque senza consegna, che e' una sezione normale invece di una
+       sezione che non si accende mai. */
+    var pronto = armato && cloneChars.length > 0;
+    if(!pronto){
+      if(!attesaMonta) attesaMonta = Date.now();
+      if(Date.now() - attesaMonta < PAZIENZA) return;
+    }
+    attesaMonta = 0;
     montata = true;
 
     document.documentElement.classList.add('is-consegna');
     studio.sospendi();
+
+    /* Il titolo non e' potuto arrivare: si scopre la sezione e si smette di
+       fingere che ci sia una consegna. Niente scambio, niente clone. */
+    if(!pronto){
+      if(!sezioneFatta){ sezioneFatta = true; entraSezione(); }
+      else dissolvi(1);
+      arrivato();
+      return;
+    }
 
     var nuove = studio.lettere(), i, firma = '';
     for(i = 0; i < nuove.length; i++) firma += lettera(nuove[i]);
@@ -1334,6 +1413,13 @@ function init(){
     if(sezioneFatta){ dissolvi(1); return; }
 
     sezioneFatta = true;
+    entraSezione();
+  }
+
+  /* L'arrivo del contorno: tendine, barra, velo che scivola via dalle
+     fotografie, cornice. Una volta sola in tutta la vita della pagina, e
+     uguale che il titolo sia arrivato o no. */
+  function entraSezione(){
     if(tlSezione) tlSezione.kill();
     tlSezione = gsap.timeline({ paused: true });
     tlSezione.add(studio.entrataRighe(), 0);
@@ -1362,6 +1448,7 @@ function init(){
   function smonta(){
     if(!montata) return;
     montata = false;
+    attesaMonta = 0;
     document.documentElement.classList.add('is-consegna');
     studio.sospendi();
     dissolvi(0);
@@ -1478,6 +1565,45 @@ function init(){
 
     requestAnimationFrame(giro);
   }
+
+  /* ——— COSA HA IN TESTA, quando qualcuno lo chiede ————————————————
+     Un accessorio da console, nello stesso stile di capeScroll.stato() e
+     capePatti(): in pagina non costa niente e non entra mai nel percorso di
+     un'animazione, ma quando qualcosa non torna evita di dedurre dai
+     sintomi. E' la lezione di questi giorni: ogni volta che ho indovinato
+     invece di leggere, ho sbagliato.
+
+     In console:  capeConsegna()  */
+  window.capeConsegna = function(){
+    var s = {
+      scroll:   Math.round(window.scrollY || window.pageYOffset),
+      bersaglio: +bersaglio().toFixed(4),   /* dove dovrebbe essere il viaggio */
+      viaggio:  +p.toFixed(4),              /* dov'e' davvero, smorzato       */
+      corsa:    Math.round(corsaViaggio),   /* quanti px dura il viaggio      */
+      armato:   armato,
+      montata:  montata,
+      sezioneFatta: sezioneFatta,
+      corpoOra: clone ? Math.round(parseFloat(clone.style.fontSize) || 0) : null,
+      inchiostro: window.inkSection ? +window.inkSection.progress.toFixed(3) : null,
+      inkPronto: !!(window.inkSection && window.inkSection.ready)
+    };
+    var mis = inkMis;
+    s.corpoInchiostro = mis ? Math.round(mis.cap / (capitaliClone() || 1)) : null;
+    /* la geometria da cui esce il bersaglio: quando non torna, e' quasi
+       sempre uno di questi quattro numeri e non la formula */
+    var y = window.scrollY || window.pageYOffset;
+    s.naturale   = Math.round(pin.getBoundingClientRect().top + y);
+    s.topIncollo = topIncollo;
+    s.fine       = s.naturale - topIncollo;
+    s.altezzaSez = sez.offsetHeight;
+    s.fineInk    = Math.round(fineInchiostro());
+    /* e le due porte che possono rifiutare l'armamento */
+    s.inkSotto92 = !!(window.inkSection && window.inkSection.ready && window.inkSection.progress < 0.92);
+    s.inPrestito = !!(studio.inPrestito && studio.inPrestito());
+    s.arrivo = arrivo ? { x: Math.round(arrivo.x), y: Math.round(arrivo.y), anc: arrivo.anc } : null;
+    s.partenza = partenza ? { x: Math.round(partenza.x), y: Math.round(partenza.y) } : null;
+    return s;
+  };
 
   function sveglia(){
     if(girando) return;
