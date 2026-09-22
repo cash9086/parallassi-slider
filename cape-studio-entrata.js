@@ -88,6 +88,25 @@ var SOGLIA    = 0;     /* 0..1 — quanta riserva si consuma bianchi prima
 var NAV_SEL   = '.header-cape';
 var NAV_CLEAR = 0.5;
 
+/* ── DOVE COMINCIA TUTTO ─────────────────────────────────────────────────
+   La sezione non aspetta piu' il proprio turno in fondo alla pagina: si
+   mette SOPRA alla polvere, mentre quella e' ancora incollata e sta
+   finendo, e li' parte.
+
+   SOPRA_DA e' il punto della corsa della polvere in cui succede: 0.95 vuol
+   dire a un ventesimo dalla fine. Si misura sulla corsa VERA, letta dal
+   riquadro nel DOM — non su window.capeDust.progress, che e' riscalato
+   sulla coda e arriva a 1 quando la corsa vera e' appena al 64%: scritto li'
+   dentro, 0.95 vorrebbe dire tutt'altro punto.
+
+   La sovrapposizione non si scrive a mano: si calcola ogni volta la
+   distanza fra dove la polvere arriva a SOPRA_DA e dove questa sezione si
+   incollerebbe da sola, e si tira su la scatola di quel tanto. Cosi' regge
+   anche se in mezzo alle due sezioni compare qualcos'altro.               */
+var DUST_SEL  = '.cape-dust-pin';
+var SOPRA_DA  = 0.95;
+var SOPRA_Z   = 8;     /* la polvere sta a 7: sopra di lei, non sotto */
+
 var MURO_CODA = 80;    /* silenzio della rotella che vale "gesto finito"   */
 var MURO_MAX  = 900;   /* e comunque il muro non tiene mai piu' di cosi'   */
 
@@ -308,6 +327,33 @@ function init(){
     stick.style.top    = topIncollo + 'px';
     stick.style.height = h + 'px';
     pin.style.height   = (h + riserva) + 'px';
+
+    sopra();
+  }
+
+  /* Tira su la scatola finche' il momento in cui la sezione si incolla non
+     cade esattamente su SOPRA_DA della corsa della polvere.
+
+     Il margine si azzera prima di misurare: se no si misurerebbe la
+     posizione che il margine di ieri ha gia' prodotto, e a ogni giro la
+     sezione salirebbe ancora. */
+  function sopra(){
+    var dust = document.querySelector(DUST_SEL);
+    if(!dust || !dust.offsetHeight){ pin.style.marginTop = ''; return; }
+
+    pin.style.marginTop = '0px';
+
+    var y = window.scrollY || window.pageYOffset;
+    var corsaDust = dust.offsetHeight - window.innerHeight;
+    if(corsaDust <= 0){ pin.style.marginTop = ''; return; }
+
+    var yDust   = dust.getBoundingClientRect().top + y + SOPRA_DA * corsaDust;
+    var yStudio = pin.getBoundingClientRect().top + y - topIncollo;
+    var su      = Math.round(yStudio - yDust);
+
+    pin.style.marginTop = (su > 0 ? -su : 0) + 'px';
+    pin.style.position  = 'relative';
+    pin.style.zIndex    = SOPRA_Z;
   }
 
   /* Quanto della riserva e' stato consumato: 0 appena la sezione si incolla,
