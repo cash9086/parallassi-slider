@@ -66,20 +66,30 @@ var ATTESA_VH = 1.00;  /* LA RISERVA — schermate di scroll in cui la sezione
                           si allunga; sotto 0.6 la soglia arriva addosso
                           all'ingresso e l'attesa non si legge piu'.        */
 
-var SOGLIA    = 0.30;  /* 0..1 — quanta riserva si consuma bianchi prima
-                          che parta tutto. A 0.30 il bianco dura tre decimi
-                          di schermata e poi parte: e' un'anticipazione, non
-                          un'attesa.
+var SOGLIA    = 0;     /* 0..1 — quanta riserva si consuma bianchi prima
+                          che parta tutto. A zero non si consuma niente: le
+                          animazioni partono nell'istante in cui la sezione
+                          si incolla al centro, che e' anche l'istante in cui
+                          il muro qui sotto ti ferma. Il bianco d'attesa non
+                          c'e' piu' — al suo posto c'e' il muro, che ottiene
+                          la stessa cosa (guardare la sezione ferma prima che
+                          cominci) senza consumare scroll.
 
-                          Da qui in giu' cambia anche chi comanda la fine.
-                          Sopra il mezzo era quasi sempre la tenuta: si
-                          arrivava in fondo alla riserva col montaggio
-                          ancora in corso, e lo sgancio trovava la riserva
-                          tutta consumata. A 0.30 restano sette decimi di
-                          schermata dopo la partenza, e scrollando piano il
-                          montaggio finisce PRIMA del fondo: si sgancia con
-                          della riserva ancora da consumare. Vedi sgancia(),
-                          che e' il posto dove questo si paga.              */
+                          A zero il confronto va fatto sul progresso GREZZO,
+                          non su quello tagliato a 0: tagliato sarebbe zero
+                          anche mille pixel piu' su, e tutto partirebbe con
+                          la sezione ancora fuori schermo. Vedi grezza().   */
+
+/* Il centro dove il muro inchioda. E' lo STESSO della planata che ricentra
+   la sezione quando ti fermi li' vicino — meta' schermo piu' mezza barra —
+   e deve restarlo: se i due non coincidessero, appena il muro molla la
+   planata correggerebbe di qualche decina di pixel e si vedrebbe. Cambiando
+   quei numeri nella planata, vanno cambiati anche qui. */
+var NAV_SEL   = '.header-cape';
+var NAV_CLEAR = 0.5;
+
+var MURO_CODA = 80;    /* silenzio della rotella che vale "gesto finito"   */
+var MURO_MAX  = 900;   /* e comunque il muro non tiene mai piu' di cosi'   */
 
 var EDGE_AT   = 0.35;  /* secondi dopo la partenza in cui compare la cornice
                           del riquadro. Non a zero: prima deve essersi mosso
@@ -305,12 +315,22 @@ function init(){
      SCATOLA, che non si incolla mai: il suo bordo alto e' il bordo alto
      naturale della sezione, sempre e su qualunque browser. Sull'elemento
      incollato le due misure che il DOM offre non concordano dappertutto. */
-  function inRiserva(){
-    if(!(riserva > 0)) return 1;
+  /* Dove si incolla, in coordinate di pagina: sotto questa quota la sezione
+     sta ancora salendo, sopra e' incollata e la riserva si consuma. */
+  function quotaIncollo(){
     var y = window.scrollY || window.pageYOffset;
-    var naturale = pin.getBoundingClientRect().top + y;
-    return cl01((y - (naturale - topIncollo)) / riserva);
+    return pin.getBoundingClientRect().top + y - topIncollo;
   }
+
+  /* Non tagliato: negativo vuol dire "non ancora incollata". Serve perche'
+     con SOGLIA a zero il taglio a 0 renderebbe vero il confronto anche a
+     mezzo schermo di distanza. */
+  function grezza(){
+    if(!(riserva > 0)) return 1;
+    return ((window.scrollY || window.pageYOffset) - quotaIncollo()) / riserva;
+  }
+
+  function inRiserva(){ return cl01(grezza()); }
 
   /* ── l'entrata ─────────────────────────────────────────────────────── */
 
@@ -492,6 +512,97 @@ function init(){
     if(window.capeScroll) capeScroll.molla(VOLANTE);
   }
 
+  /* ── il muro d'ingresso ────────────────────────────────────────────────
+     Chi arriva lanciato sulla sezione studio la supererebbe mentre le
+     animazioni partono, e quelle si giocano una volta sola: chi le perde non
+     le rivede. Quindi qui si sbatte.
+
+     Si spende UNA VOLTA e solo prima che il montaggio parta — dopo non
+     avrebbe piu' senso fermare niente. E' la stessa meccanica dei muri
+     dell'orizzontale: si spegne la corsa, si tiene il punto e si ingoiano i
+     colpi della rotella finche' ne arrivano, poi si apre. Non conta il
+     tempo: conta che il gesto con cui sei arrivato sia finito. */
+  var VOLANTE_MURO = 'studio-muro';
+  var muroSpeso = false, yPrec = null;
+
+  function altezzaNav(){
+    var n = document.querySelector(NAV_SEL);
+    if(!n) return 0;
+    var cs = getComputedStyle(n);
+    if(cs.position !== 'fixed' && cs.position !== 'sticky') return 0;
+    if(cs.display === 'none' || cs.visibility === 'hidden') return 0;
+    var r = n.getBoundingClientRect();
+    return (r.top < 2 && r.height > 0) ? r.height : 0;
+  }
+
+  /* Il centro della planata, calcolato come lo calcola lei. */
+  function quotaCentro(){
+    var y = window.scrollY || window.pageYOffset;
+    var r = sez.getBoundingClientRect();
+    return y + r.top + r.height / 2 -
+           (window.innerHeight / 2 + altezzaNav() * NAV_CLEAR);
+  }
+
+  function muro(){
+    if(muroSpeso || partita) return;
+
+    var meta = quotaCentro();
+    var y = window.scrollY || window.pageYOffset;
+
+    /* Solo scendendo, e solo nel fotogramma in cui il centro viene
+       attraversato: piu' in la' riportare indietro sarebbe uno strappo. */
+    if(yPrec === null || y < yPrec || yPrec >= meta || y < meta){ yPrec = y; return; }
+    yPrec = y;
+
+    if(!window.capeScroll || !capeScroll.prendi(VOLANTE_MURO, capeScroll.MURO)){
+      muroSpeso = true;
+      return;
+    }
+    muroSpeso = true;
+
+    capeScroll.ferma(VOLANTE_MURO);
+    capeScroll.vaA(VOLANTE_MURO, meta, { immediate: true });
+
+    var vivoM = true, q = null, rete = null;
+
+    function pianta(){
+      if(Math.abs((window.scrollY || window.pageYOffset) - meta) < 1) return;
+      window.scrollTo(0, meta);
+      if(window.lenis && window.lenis.scrollTo){
+        window.lenis.scrollTo(meta, { immediate: true, force: true });
+      }
+    }
+
+    function apri(){
+      if(!vivoM) return;
+      vivoM = false;
+      clearTimeout(q); clearTimeout(rete);
+      removeEventListener('wheel', colpo);
+      if(window.lenis && window.lenis.scrollTo){
+        window.lenis.scrollTo(meta, { immediate: true, force: true });
+      }
+      if(window.capeScroll) capeScroll.molla(VOLANTE_MURO);
+      yPrec = window.scrollY || window.pageYOffset;
+    }
+
+    function colpo(){
+      if(!vivoM) return;
+      clearTimeout(q);
+      q = setTimeout(apri, MURO_CODA);
+    }
+
+    function tieni(){
+      if(!vivoM) return;
+      pianta();
+      requestAnimationFrame(tieni);
+    }
+
+    addEventListener('wheel', colpo, { passive: true });
+    q    = setTimeout(apri, MURO_CODA);
+    rete = setTimeout(apri, MURO_MAX);
+    requestAnimationFrame(tieni);
+  }
+
   /* ── il giro ───────────────────────────────────────────────────────────
      Una lettura di layout per fotogramma, e solo mentre la sezione e' a
      tiro. A cose fatte non ne fa piu' nessuna: da li' in poi qui non c'e'
@@ -504,7 +615,8 @@ function init(){
     if(!vivo || (finita && tenutaSpesa)) return;
 
     var q = inRiserva();
-    if(!partita && q >= SOGLIA) entra();
+    muro();
+    if(!partita && grezza() >= SOGLIA) entra();
     if(partita && !tenutaSpesa && q >= 1) trattieni();
   }
 
