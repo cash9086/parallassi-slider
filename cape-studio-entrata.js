@@ -59,12 +59,18 @@
 
 /* ── le manopole ─────────────────────────────────────────────────────── */
 
-var ATTESA_VH = 1.00;  /* LA RISERVA — schermate di scroll in cui la sezione
-                          sta ferma e bianca. E' l'unico scroll che questa
-                          entrata AGGIUNGE alla pagina, e resta li' anche
-                          dopo: e' altezza, non uno stato. Alzandola l'attesa
-                          si allunga; sotto 0.6 la soglia arriva addosso
-                          all'ingresso e l'attesa non si legge piu'.        */
+var ATTESA_VH = 0.60;  /* LA RISERVA — schermate di scroll in cui la sezione
+                          sta ferma al suo posto. Non e' piu' un'attesa
+                          bianca: e' lo spazio in cui la dissolvenza entra e
+                          esce, piu' un po' di respiro in mezzo in cui la
+                          sezione si guarda ferma.
+
+                          Tenerla molto piu' alta di 2xFADE vuol dire
+                          scrollare a vuoto con la sezione immobile, ed e'
+                          esattamente quello che si vedeva quando valeva 1:
+                          una schermata intera di niente. Sotto 2xFADE le due
+                          dissolvenze si accavallano e la sezione non arriva
+                          mai a vedersi piena.                              */
 
 var SOGLIA    = 0;     /* 0..1 — quanta riserva si consuma bianchi prima
                           che parta tutto. A zero non si consuma niente: le
@@ -629,6 +635,22 @@ function init(){
   }
 
   misura();
+
+  /* Quanto scroll passa fra la fine della polvere e il momento in cui questa
+     sezione si mostra. E' il tratto in cui non c'e' niente da vedere: se e'
+     grosso, si scrolla nel bianco. Si dice una volta sola, e solo se c'e'
+     davvero qualcosa da dire. */
+  setTimeout(function(){
+    var dust = document.querySelector('.cape-dust-pin');
+    if(!dust || !dust.offsetHeight) return;
+    var y  = window.scrollY || window.pageYOffset;
+    var fineDust = dust.getBoundingClientRect().bottom + y - window.innerHeight;
+    var vuoto = Math.round((quotaIncollo() - fineDust) / window.innerHeight * 100);
+    if(vuoto > 8){
+      console.info('[studio] fra la fine della polvere e la comparsa della ' +
+        'sezione ci sono ' + vuoto + 'vh di scroll vuoto.');
+    }
+  }, 1200);
 
   if(document.fonts && document.fonts.ready){
     document.fonts.ready.then(function(){ misura(); sveglia(); });
