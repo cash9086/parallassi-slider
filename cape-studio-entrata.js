@@ -88,6 +88,12 @@ var SOGLIA    = 0;     /* 0..1 — quanta riserva si consuma bianchi prima
 var NAV_SEL   = '.header-cape';
 var NAV_CLEAR = 0.5;
 
+/* Quanta riserva serve al fade, a ciascun capo. La sezione non si vede MAI
+   mentre trasla: compare quando e' gia' ferma al suo posto — sul bianco con
+   cui finisce la polvere — e se ne va in opacita' senza muoversi. Quando poi
+   si stacca e scorre via e' gia' invisibile da un pezzo.                   */
+var FADE      = 0.22;
+
 var MURO_CODA = 80;    /* silenzio della rotella che vale "gesto finito"   */
 var MURO_MAX  = 900;   /* e comunque il muro non tiene mai piu' di cosi'   */
 
@@ -283,15 +289,9 @@ function init(){
 
   /* ── le misure ─────────────────────────────────────────────────────── */
 
-  var topIncollo = 0, riserva = 0, sganciata = false;
+  var topIncollo = 0, riserva = 0;
 
   function misura(){
-    /* Sganciata, non c'e' piu' niente da misurare: la scatola e' alta quanto
-       la sezione e la sezione sta nel flusso come tutte le altre. Rimisurare
-       vorrebbe dire rimetterle addosso la riserva che le abbiamo appena
-       tolto — e lo farebbe al primo ridimensionamento, senza dire niente. */
-    if(sganciata) return;
-
     var h = sez.offsetHeight || window.innerHeight;
     if(window.innerWidth < MIN_W){ pin.style.height = ''; stick.style.height = ''; return; }
 
@@ -380,7 +380,6 @@ function init(){
     gsap.set(titolo, { clearProps: 'transform' });
     document.documentElement.classList.remove(FERMA_PLANATA);
 
-    sgancia();
     molla();
     studio.riprendi();
   }
@@ -413,33 +412,6 @@ function init(){
      Lo scroll lo muove il volante, a livello CORREZIONE: e' proprio il caso
      per cui quel livello esiste — la pagina si e' accorciata, lo scroll DEVE
      seguirla, e nessuno ha il diritto di interrompere. */
-  function sgancia(){
-    if(sganciata) return;
-
-    var y = window.scrollY || window.pageYOffset;
-    var naturale = pin.getBoundingClientRect().top + y;
-    var consumato = Math.max(0, Math.min(riserva, y - (naturale - topIncollo)));
-
-    sganciata = true;
-    riserva = 0;
-
-    pin.style.height     = '';
-    stick.style.position = 'static';
-    stick.style.top      = '';
-    stick.style.height   = '';
-
-    /* Lenis tiene una sua copia dell'altezza del documento e la rilegge per
-       conto suo, ma non in questo fotogramma: senza questa riga lo scroll a
-       cui lo mandiamo qui sotto verrebbe tagliato sul fondo vecchio. E'
-       l'unica riga di questo file che tocca Lenis direttamente, e tocca
-       perche' non c'e' un modo di chiederlo al volante. */
-    try{ if(window.lenis && window.lenis.resize) window.lenis.resize(); }catch(e){}
-
-    if(consumato < 1) return;
-    if(!window.capeScroll) return;
-    if(!capeScroll.prendi(VOLANTE, capeScroll.CORREZIONE)) return;
-    capeScroll.vaA(VOLANTE, Math.max(0, y - consumato), { immediate: true });
-  }
 
   /* Il montaggio a fondo corsa, subito. La chiama chi sa che il momento e'
      passato: la sezione uscita dallo schermo, o la rete della tenuta.
@@ -603,6 +575,35 @@ function init(){
     requestAnimationFrame(tieni);
   }
 
+  /* ── apparire e sparire, senza muoversi ───────────────────────────────
+     La sezione non si vede mai mentre trasla. Compare gia' ferma al suo
+     posto, sul bianco con cui finisce la polvere, e se ne va in opacita'
+     senza muoversi di un pixel — in su e in giu' allo stesso modo. Quando
+     poi si stacca davvero e scorre via, e' invisibile da un pezzo.
+
+     La prima volta non c'e' nessun fade in entrata: a rivelarla e' il
+     montaggio, ed e' l'unica entrata vera che ha. Il fade in entrata serve
+     dalla seconda volta in poi, quando torni a vederla. `ritorno` distingue
+     i due casi, e si accende solo dopo che sei uscito davvero: se si
+     accendesse a montaggio finito, con la riserva ancora tutta da consumare,
+     la sezione sparirebbe di colpo appena il muro molla. */
+  var ritorno = false, appUlt = -1;
+
+  function apparizione(){
+    var g = grezza();
+    if(finita && (g < 0 || g > 1)) ritorno = true;
+
+    var o = cl01((1 - g) / FADE);
+    if(ritorno) o = Math.min(o, cl01(g / FADE));
+
+    o = Math.round(o * 1000) / 1000;
+    if(o === appUlt) return;
+    appUlt = o;
+
+    sez.style.opacity       = o;
+    sez.style.pointerEvents = o < 0.02 ? 'none' : '';
+  }
+
   /* ── il giro ───────────────────────────────────────────────────────────
      Una lettura di layout per fotogramma, e solo mentre la sezione e' a
      tiro. A cose fatte non ne fa piu' nessuna: da li' in poi qui non c'e'
@@ -612,16 +613,17 @@ function init(){
 
   function passo(){
     girando = false;
-    if(!vivo || (finita && tenutaSpesa)) return;
+    if(!vivo) return;
 
     var q = inRiserva();
     muro();
+    apparizione();
     if(!partita && grezza() >= SOGLIA) entra();
     if(partita && !tenutaSpesa && q >= 1) trattieni();
   }
 
   function sveglia(){
-    if(girando || (finita && tenutaSpesa)) return;
+    if(girando) return;
     girando = true;
     requestAnimationFrame(passo);
   }
