@@ -56,19 +56,24 @@
 
 /* ── le manopole ─────────────────────────────────────────────────────── */
 
-var ATTESA_VH = 0.22;  /* LA RISERVA, e adesso e' una cosa sola: la finestra
-                          in cui la sezione sta ferma al suo posto e sfuma.
+var ATTESA_VH = 0.35;  /* LA RISERVA: la finestra in cui la sezione sta ferma
+                          al suo posto. Sta tutta dal lato della POLVERE,
+                          perche' e' li' che sparisce — risalendo svanisce,
+                          ridiscendendo ricompare. Andando avanti resta.    */
 
-                          Sta tutta dal lato della POLVERE, perche' e' li'
-                          che sparisce. Risalendo verso la polvere svanisce,
-                          ridiscendendo ricompare. Andando AVANTI invece
-                          resta: non c'e' niente da sfumare in basso, quindi
-                          sotto non serve un dito di riserva — ed era quella,
-                          la riserva sprecata che si leggeva sulla barra come
-                          un tratto lunghissimo in cui non succedeva niente.
+var FADE_Q    = 0.45;  /* quanta riserva se ne prende la dissolvenza, contata
+                          dal basso. Il resto — piu' della meta' — e' il
+                          margine in cui la sezione e' PIENA e ferma.
 
-                          Alzala per una dissolvenza piu' lunga. E' anche
-                          quanto scroll costa, quindi il prezzo si vede.    */
+                          Serve, e serve grosso: il montaggio parte in cima
+                          alla riserva, ed e' li' che ti fermi a guardare lo
+                          slider. Se la dissolvenza arrivasse fin lassu',
+                          staresti seduto sul suo bordo: la planata che
+                          ricentra, Lenis che si assesta, una fotografia che
+                          finisce di caricare — basta un nulla che muova lo
+                          scroll e la sezione comincia a sbiadire mentre la
+                          guardi. Con il margine, prima che l'opacita' si
+                          muova devi tornare indietro sul serio.            */
 
 var EDGE_AT   = 0.35;  /* secondi dopo la partenza in cui compare la cornice
                           del riquadro. Non a zero: prima deve essersi mosso
@@ -442,11 +447,13 @@ function init(){
      La prima volta la rampa non si vede lo stesso: fino al montaggio la
      sezione e' spenta — titolo, testo, fotografie, tutto a zero — quindi
      quello che sfuma e' un riquadro vuoto sul bianco della polvere. A
-     rivelarla e' il montaggio, che parte in cima alla rampa. */
+     rivelarla e' il montaggio, che parte in cima alla RISERVA — non in cima
+     alla rampa: fra le due c'e' il margine di FADE_Q, ed e' quello che tiene
+     la sezione piena mentre te la guardi. */
   var appUlt = -1;
 
   function apparizione(){
-    var o = Math.round(cl01(grezza()) * 1000) / 1000;
+    var o = Math.round(cl01(grezza() / FADE_Q) * 1000) / 1000;
     if(o === appUlt) return;
     appUlt = o;
 
