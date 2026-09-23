@@ -475,7 +475,12 @@ function vesti(){
     /* La riga deve essere larga quanto la sezione, qualunque sia
        l'allineamento nel Designer: con Align center si allargherebbe quanto
        il nastro, migliaia di pixel, e finirebbe centrata fuori schermo. */
-    '.cape-rotta-riga{overflow-x:clip;overflow-y:visible;align-self:stretch;width:auto;min-width:0;max-width:100%}',
+    '.cape-rotta-riga{overflow-x:clip;overflow-y:visible;align-self:stretch;width:auto;min-width:0;max-width:100%;' +
+      'display:flex;justify-content:flex-start;flex-wrap:nowrap}',
+    /* Il nastro parte sempre dal bordo sinistro della riga. Con Justify
+       center nel Designer verrebbe centrato: è migliaia di pixel più largo
+       dello schermo, e sborderebbe da tutte e due le parti. */
+    '.cape-rotta-nastro{flex:0 0 auto;margin:0;align-self:center}',
     '.cape-rotta-nastro{display:flex;width:max-content;will-change:transform}',
     '.cape-rotta-giro{display:flex;flex:none}',
     '.cape-rotta-giro>*{flex:none;white-space:nowrap;position:relative}',
@@ -499,6 +504,27 @@ function init(){
   var righe = [].slice.call(sez.querySelectorAll(RIGA));
   if(!righe.length) return;
   var cta = sez.querySelector(CTA);
+  /* Se il bottone sta direttamente nella sezione, senza contenitore, glielo
+     si fa: la tendina ha bisogno di un bordo dietro cui nascondersi. Il
+     contenitore prende il posto del bottone nella colonna della sezione. */
+  if(!cta){
+    var solo = null;
+    [].forEach.call(sez.children, function(c){
+      if(!solo && !c.matches(RIGA) && (c.matches('a, button') || c.querySelector('a, button'))) solo = c;
+    });
+    if(solo){
+      var cs0 = getComputedStyle(solo);
+      cta = document.createElement('div');
+      cta.className = 'cape-rotta-cta';
+      var as = cs0.alignSelf;
+      if(as === 'auto' || as === 'normal') as = getComputedStyle(sez).alignItems;
+      cta.style.alignSelf = (as === 'normal' || as === 'stretch') ? 'center' : as;
+      cta.style.margin = cs0.margin;
+      solo.style.margin = '0';
+      solo.parentNode.insertBefore(cta, solo);
+      cta.appendChild(solo);
+    }
+  }
 
   var ridotto = false;
   try{ ridotto = matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
@@ -581,7 +607,7 @@ function init(){
       n.w = n.riga.clientWidth;
       n.h = n.riga.clientHeight;
       n.largo = n.giro.getBoundingClientRect().width || 1;
-      var copie = Math.ceil(Math.max(n.w, window.innerWidth) / n.largo) + 1;
+      var copie = Math.ceil(Math.max(n.w, window.innerWidth) / n.largo) + 2;
       for(var i = 1; i < copie; i++){
         var c = n.giro.cloneNode(true);
         c.setAttribute('aria-hidden', 'true');
@@ -724,9 +750,11 @@ function init(){
       var rr = { left: Math.max(q0.left, 0), right: Math.min(q0.right, window.innerWidth) };
       rr.width = Math.max(1, rr.right - rr.left);
       var W = rr.width;
+      /* Tutte le voci, anche quelle fuori schermo: prima che il nastro
+         parta devono essere scritte tutte. Fuori schermo il ritardo è
+         quello del bordo più vicino. */
       [].forEach.call(n.nastro.querySelectorAll('.cape-rotta-giro>*'), function(v){
         var q = v.getBoundingClientRect();
-        if(q.right < rr.left - 40 || q.left > rr.right + 40) return;
         if(v.classList.contains('is-piano')){ piani.push([v, q, n, rr]); return; }
         var t = v.querySelector('.cape-rotta-tratto');
         if(!t) return;
