@@ -14,29 +14,26 @@
 
    COSA SUCCEDE ADESSO
    -------------------
-   1. La sezione si incolla al centro dello schermo ed e' BIANCA: titolo,
-      descrizione, bottone, fotografie e barra ci sono tutti — misurabili,
-      impaginati — ma spenti. Dietro di lei si apre la riserva: una schermata
-      di scroll in cui non si muove niente.
-   2. Consumata la riserva per SOGLIA, parte tutto insieme: il titolo sale da
-      dietro il proprio bordo, le righe di testo e il bottone anche, la barra
-      del carosello pure, e il velo bianco sulle fotografie se ne va con la
+   1. La polvere finisce in un bianco a tutto schermo. Su quel bianco questa
+      sezione COMPARE: non arriva scrollando dal basso, e' gia' al suo posto
+      — incollata al centro — e sfuma dentro mentre la riserva si consuma.
+      Finche' il montaggio non parte e' spenta, quindi quello che sfuma e' un
+      riquadro vuoto: a occhio, sul bianco, non si vede niente.
+   2. In cima alla riserva parte tutto insieme: il titolo sale da dietro il
+      proprio bordo, le righe di testo e il bottone anche, la barra del
+      carosello pure, e il velo bianco sulle fotografie se ne va con la
       scivolata inclinata con cui entra un'immagine nuova. Sotto si apre il
-      riquadro con dentro la fotografia.
-   3. Arrivati in fondo alla riserva, se il montaggio sta ancora girando la
-      sezione ti TRATTIENE: lo scroll si ferma li' finche' l'ultima animazione
-      non ha finito, poi riparte. E' la stessa idea di trattieni() nell'intro
-      — una riserva che si consuma stando fermi — con una differenza: qui non
-      basta la riserva, perche' il montaggio dura un tempo suo e una rotellata
-      lanciata se la mangia. Quindi al fondo della riserva si prende il
-      volante e si ferma davvero.
-   4. Finito il montaggio la riserva SI SGANCIA: la scatola alta torna alta
-      quanto la sezione, la sezione smette di essere incollata, e da li' in
-      poi appena scrolli se ne va. Non resta un tratto morto da consumare da
-      fermi: quello serviva a tenere ferma la sezione mentre si montava, e a
-      montaggio fatto e' solo scroll a vuoto.
-   5. Una volta sola, in tutta la vita della pagina. Si risale, si riscende,
-      non succede piu' niente e il carosello gira all'infinito per conto suo.
+      riquadro con dentro la fotografia. E' l'unica entrata vera che ha.
+   3. Mentre il montaggio gira la sezione ti TRATTIENE: prende il volante e
+      lo scroll si ferma, se no una rotellata lanciata se lo mangia e chi
+      corre non lo vede. Finito, molla. Una volta sola.
+   4. Da li' in avanti la sezione RESTA: se ne va con la pagina, come una
+      qualunque. La dissolvenza sta tutta dall'altra parte — risalendo verso
+      la polvere svanisce prima di rimettersi in moto, e ridiscendendo
+      ricompare ferma dov'era.
+   5. Il montaggio, una volta sola in tutta la vita della pagina. Si risale,
+      si riscende, e quello non si rigioca: la sezione va e viene in
+      dissolvenza, e il carosello gira all'infinito per conto suo.
 
    NON ANIMA NIENTE DA SOLO
    ------------------------
@@ -59,49 +56,19 @@
 
 /* ── le manopole ─────────────────────────────────────────────────────── */
 
-var ATTESA_VH = 0.60;  /* LA RISERVA — schermate di scroll in cui la sezione
-                          sta ferma al suo posto. Non e' piu' un'attesa
-                          bianca: e' lo spazio in cui la dissolvenza entra e
-                          esce, piu' un po' di respiro in mezzo in cui la
-                          sezione si guarda ferma.
+var ATTESA_VH = 0.22;  /* LA RISERVA, e adesso e' una cosa sola: la finestra
+                          in cui la sezione sta ferma al suo posto e sfuma.
 
-                          Tenerla molto piu' alta di 2xFADE vuol dire
-                          scrollare a vuoto con la sezione immobile, ed e'
-                          esattamente quello che si vedeva quando valeva 1:
-                          una schermata intera di niente. Sotto 2xFADE le due
-                          dissolvenze si accavallano e la sezione non arriva
-                          mai a vedersi piena.                              */
+                          Sta tutta dal lato della POLVERE, perche' e' li'
+                          che sparisce. Risalendo verso la polvere svanisce,
+                          ridiscendendo ricompare. Andando AVANTI invece
+                          resta: non c'e' niente da sfumare in basso, quindi
+                          sotto non serve un dito di riserva — ed era quella,
+                          la riserva sprecata che si leggeva sulla barra come
+                          un tratto lunghissimo in cui non succedeva niente.
 
-var SOGLIA    = 0;     /* 0..1 — quanta riserva si consuma bianchi prima
-                          che parta tutto. A zero non si consuma niente: le
-                          animazioni partono nell'istante in cui la sezione
-                          si incolla al centro, che e' anche l'istante in cui
-                          il muro qui sotto ti ferma. Il bianco d'attesa non
-                          c'e' piu' — al suo posto c'e' il muro, che ottiene
-                          la stessa cosa (guardare la sezione ferma prima che
-                          cominci) senza consumare scroll.
-
-                          A zero il confronto va fatto sul progresso GREZZO,
-                          non su quello tagliato a 0: tagliato sarebbe zero
-                          anche mille pixel piu' su, e tutto partirebbe con
-                          la sezione ancora fuori schermo. Vedi grezza().   */
-
-/* Il centro dove il muro inchioda. E' lo STESSO della planata che ricentra
-   la sezione quando ti fermi li' vicino — meta' schermo piu' mezza barra —
-   e deve restarlo: se i due non coincidessero, appena il muro molla la
-   planata correggerebbe di qualche decina di pixel e si vedrebbe. Cambiando
-   quei numeri nella planata, vanno cambiati anche qui. */
-var NAV_SEL   = '.header-cape';
-var NAV_CLEAR = 0.5;
-
-/* Quanta riserva serve al fade, a ciascun capo. La sezione non si vede MAI
-   mentre trasla: compare quando e' gia' ferma al suo posto — sul bianco con
-   cui finisce la polvere — e se ne va in opacita' senza muoversi. Quando poi
-   si stacca e scorre via e' gia' invisibile da un pezzo.                   */
-var FADE      = 0.22;
-
-var MURO_CODA = 80;    /* silenzio della rotella che vale "gesto finito"   */
-var MURO_MAX  = 900;   /* e comunque il muro non tiene mai piu' di cosi'   */
+                          Alzala per una dissolvenza piu' lunga. E' anche
+                          quanto scroll costa, quindi il prezzo si vede.    */
 
 var EDGE_AT   = 0.35;  /* secondi dopo la partenza in cui compare la cornice
                           del riquadro. Non a zero: prima deve essersi mosso
@@ -328,9 +295,11 @@ function init(){
     return pin.getBoundingClientRect().top + y - topIncollo;
   }
 
-  /* Non tagliato: negativo vuol dire "non ancora incollata". Serve perche'
-     con SOGLIA a zero il taglio a 0 renderebbe vero il confronto anche a
-     mezzo schermo di distanza. */
+  /* Non tagliato. Sotto zero vuol dire "non ancora incollata", sopra uno
+     "gia' andata avanti", e servono tutte e due: la dissolvenza ha bisogno
+     del valore vero per sapere a che punto e', e il montaggio parte a 1 —
+     con la misura tagliata sarebbe 1 anche mille pixel piu' avanti, e
+     ripartirebbe risalendo. */
   function grezza(){
     if(!(riserva > 0)) return 1;
     return ((window.scrollY || window.pageYOffset) - quotaIncollo()) / riserva;
@@ -390,35 +359,6 @@ function init(){
     studio.riprendi();
   }
 
-  /* ——— lo sgancio ————————————————————————————————————————————————————
-     La riserva e' altezza: serve a tenere la sezione incollata mentre si
-     monta, e a montaggio fatto diventa scroll a vuoto — arrivi in fondo con
-     lo slider acceso e devi ancora spingere per un pezzo prima che la
-     sezione si muova. Quindi si toglie.
-
-     Togliere altezza a una pagina sotto a chi la sta guardando fa saltare
-     tutto in su. Ma di quanto, si sa esattamente: tanto quanto la riserva
-     gia' consumata. Si toglie quello allo scroll e la sezione resta dov'e',
-     al pixel — vale mentre e' ancora incollata, e vale anche se nel
-     frattempo si e' staccata e se ne sta andando, perche' li' si e' spostata
-     in giu' esattamente della riserva intera.
-
-     Quello che sta SOTTO la sezione si sposta per davvero: si alza di
-     quanta riserva era rimasta da consumare. Finche' il montaggio finisce in
-     fondo alla riserva non ne resta, e il conto e' zero. Piu' SOGLIA e'
-     bassa, piu' capita di sganciare con della riserva ancora avanzata.
-
-     Quanto se ne vede: la sezione e' alta 52vw (45.4 sopra i 1920), cioe'
-     un filo meno di uno schermo, e si incolla centrata — quindi sotto di lei
-     resta una striscia di una ventina di pixel sul bordo basso. E' li', e
-     solo li', che si vede qualcosa: quella striscia passa dal fondo della
-     pagina alla cima della sezione dopo. Non si sposta niente di quello che
-     stai guardando.
-
-     Lo scroll lo muove il volante, a livello CORREZIONE: e' proprio il caso
-     per cui quel livello esiste — la pagina si e' accorciata, lo scroll DEVE
-     seguirla, e nessuno ha il diritto di interrompere. */
-
   /* Il montaggio a fondo corsa, subito. La chiama chi sa che il momento e'
      passato: la sezione uscita dallo schermo, o la rete della tenuta.
 
@@ -437,9 +377,9 @@ function init(){
      arrivati in fondo, se non ha ancora finito, si prende il volante e si
      ferma davvero.
 
-     Con SOGLIA bassa questo capita solo a chi corre — chi scrolla piano
-     arriva in fondo a montaggio gia' finito e non lo vede nemmeno. Va bene
-     cosi': e' una rete, non una tappa.
+     Adesso il montaggio parte proprio in fondo alla riserva, quindi la
+     tenuta cade sulla sua partenza: e' lei che ti ferma mentre guardi, ed e'
+     l'unica volta che succede — si spende una volta sola.
 
      Si prende a livello MURO e non SNAP: questo non e' una planata a cui si
      puo' rinunciare, e a quel livello la planata dello studio non puo'
@@ -490,119 +430,23 @@ function init(){
     if(window.capeScroll) capeScroll.molla(VOLANTE);
   }
 
-  /* ── il muro d'ingresso ────────────────────────────────────────────────
-     Chi arriva lanciato sulla sezione studio la supererebbe mentre le
-     animazioni partono, e quelle si giocano una volta sola: chi le perde non
-     le rivede. Quindi qui si sbatte.
-
-     Si spende UNA VOLTA e solo prima che il montaggio parta — dopo non
-     avrebbe piu' senso fermare niente. E' la stessa meccanica dei muri
-     dell'orizzontale: si spegne la corsa, si tiene il punto e si ingoiano i
-     colpi della rotella finche' ne arrivano, poi si apre. Non conta il
-     tempo: conta che il gesto con cui sei arrivato sia finito. */
-  var VOLANTE_MURO = 'studio-muro';
-  var muroSpeso = false, yPrec = null;
-
-  function altezzaNav(){
-    var n = document.querySelector(NAV_SEL);
-    if(!n) return 0;
-    var cs = getComputedStyle(n);
-    if(cs.position !== 'fixed' && cs.position !== 'sticky') return 0;
-    if(cs.display === 'none' || cs.visibility === 'hidden') return 0;
-    var r = n.getBoundingClientRect();
-    return (r.top < 2 && r.height > 0) ? r.height : 0;
-  }
-
-  /* Il centro della planata, calcolato come lo calcola lei. */
-  function quotaCentro(){
-    var y = window.scrollY || window.pageYOffset;
-    var r = sez.getBoundingClientRect();
-    return y + r.top + r.height / 2 -
-           (window.innerHeight / 2 + altezzaNav() * NAV_CLEAR);
-  }
-
-  function muro(){
-    if(muroSpeso || partita) return;
-
-    var meta = quotaCentro();
-    var y = window.scrollY || window.pageYOffset;
-
-    /* Solo scendendo, e solo nel fotogramma in cui il centro viene
-       attraversato: piu' in la' riportare indietro sarebbe uno strappo. */
-    if(yPrec === null || y < yPrec || yPrec >= meta || y < meta){ yPrec = y; return; }
-    yPrec = y;
-
-    if(!window.capeScroll || !capeScroll.prendi(VOLANTE_MURO, capeScroll.MURO)){
-      muroSpeso = true;
-      return;
-    }
-    muroSpeso = true;
-
-    capeScroll.ferma(VOLANTE_MURO);
-    capeScroll.vaA(VOLANTE_MURO, meta, { immediate: true });
-
-    var vivoM = true, q = null, rete = null;
-
-    function pianta(){
-      if(Math.abs((window.scrollY || window.pageYOffset) - meta) < 1) return;
-      window.scrollTo(0, meta);
-      if(window.lenis && window.lenis.scrollTo){
-        window.lenis.scrollTo(meta, { immediate: true, force: true });
-      }
-    }
-
-    function apri(){
-      if(!vivoM) return;
-      vivoM = false;
-      clearTimeout(q); clearTimeout(rete);
-      removeEventListener('wheel', colpo);
-      if(window.lenis && window.lenis.scrollTo){
-        window.lenis.scrollTo(meta, { immediate: true, force: true });
-      }
-      if(window.capeScroll) capeScroll.molla(VOLANTE_MURO);
-      yPrec = window.scrollY || window.pageYOffset;
-    }
-
-    function colpo(){
-      if(!vivoM) return;
-      clearTimeout(q);
-      q = setTimeout(apri, MURO_CODA);
-    }
-
-    function tieni(){
-      if(!vivoM) return;
-      pianta();
-      requestAnimationFrame(tieni);
-    }
-
-    addEventListener('wheel', colpo, { passive: true });
-    q    = setTimeout(apri, MURO_CODA);
-    rete = setTimeout(apri, MURO_MAX);
-    requestAnimationFrame(tieni);
-  }
-
   /* ── apparire e sparire, senza muoversi ───────────────────────────────
-     La sezione non si vede mai mentre trasla. Compare gia' ferma al suo
-     posto, sul bianco con cui finisce la polvere, e se ne va in opacita'
-     senza muoversi di un pixel — in su e in giu' allo stesso modo. Quando
-     poi si stacca davvero e scorre via, e' invisibile da un pezzo.
+     La sezione non si vede mai mentre trasla: sotto la riserva e' a zero,
+     dentro la riserva e' incollata al suo posto e sfuma, sopra e' piena.
 
-     La prima volta non c'e' nessun fade in entrata: a rivelarla e' il
-     montaggio, ed e' l'unica entrata vera che ha. Il fade in entrata serve
-     dalla seconda volta in poi, quando torni a vederla. `ritorno` distingue
-     i due casi, e si accende solo dopo che sei uscito davvero: se si
-     accendesse a montaggio finito, con la riserva ancora tutta da consumare,
-     la sezione sparirebbe di colpo appena il muro molla. */
-  var ritorno = false, appUlt = -1;
+     Una rampa sola, e sta dal lato della polvere. Risalendo verso la polvere
+     la sezione svanisce prima di rimettersi in moto; ridiscendendo ricompare
+     ferma dov'era. Andando avanti non sfuma niente: resta piena e se ne va
+     con la pagina, come una sezione qualunque.
+
+     La prima volta la rampa non si vede lo stesso: fino al montaggio la
+     sezione e' spenta — titolo, testo, fotografie, tutto a zero — quindi
+     quello che sfuma e' un riquadro vuoto sul bianco della polvere. A
+     rivelarla e' il montaggio, che parte in cima alla rampa. */
+  var appUlt = -1;
 
   function apparizione(){
-    var g = grezza();
-    if(finita && (g < 0 || g > 1)) ritorno = true;
-
-    var o = cl01((1 - g) / FADE);
-    if(ritorno) o = Math.min(o, cl01(g / FADE));
-
-    o = Math.round(o * 1000) / 1000;
+    var o = Math.round(cl01(grezza()) * 1000) / 1000;
     if(o === appUlt) return;
     appUlt = o;
 
@@ -622,9 +466,12 @@ function init(){
     if(!vivo) return;
 
     var q = inRiserva();
-    muro();
     apparizione();
-    if(!partita && grezza() >= SOGLIA) entra();
+    /* A riserva consumata, cioe' a dissolvenza finita: la sezione e' piena
+       e ferma, ed e' li' che il montaggio ha senso. Sulla misura GREZZA,
+       non su quella tagliata: tagliata sarebbe 1 anche mille pixel piu'
+       avanti, e il montaggio ripartirebbe risalendo. */
+    if(!partita && grezza() >= 1) entra();
     if(partita && !tenutaSpesa && q >= 1) trattieni();
   }
 
