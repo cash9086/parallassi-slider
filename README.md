@@ -11,7 +11,7 @@ custom code della pagina, perché là lo spazio è finito.
 | `cape-studio-entrata.js` | la sezione studio: bianca, poi tutto insieme, una volta sola | ~15 KB |
 | `cape-rotta.js` | la sezione fra studio e cape-open: città e coordinate scritte a schizzo, in due righe che scorrono | ~30 KB |
 | `cape-matita.js` | i segni a matita della home — sole e uccellini sulla slide bianca, luna e stelle sulla nera, frecce nello studio — che si disegnano una volta e se ne vanno | ~28 KB |
-| `cape-surfista.js` | il surfista del footer: la matita lo ricalca una volta, poi cavalca l'onda per sempre in stop-motion | ~30 KB |
+| `cape-surfista.js` | il surfista del footer a matita, già in stop-motion: il video lo scopre mentre cavalca l'onda | ~30 KB |
 
 `reel-salita.js` e `cape-open.js` non hanno dipendenze — niente GSAP, niente
 jQuery. `camera-oscura.js` vuole GSAP e ScrollTrigger già caricati.

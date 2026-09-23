@@ -2,19 +2,18 @@
    Il surfista del footer, a matita e in stop-motion.
 
    COSA SUCCEDE
-   1. Finché il footer non si scopre, al posto dell'immagine non c'è niente.
-   2. La prima volta che il video, salendo, lascia l'immagine tutta in vista,
-      la matita la disegna: prima il surfista, poi le onde da sinistra a
-      destra, poi gli spruzzi che si aprono verso sinistra. Una volta sola
-      nella vita della pagina.
-   3. Da lì in poi il disegno resta e si muove per sempre, come un film a
-      passo uno: otto fotogrammi al secondo circa, e a ogni fotogramma la
-      mano ripassa le linee in modo appena diverso, così le linee "bollono".
-      Il surfista sale e scende sull'onda e si inclina un poco, le onde
-      ondeggiano una dopo l'altra, gli spruzzi frizzano. Un giro dura 3.2
-      secondi.
-   4. Quando il footer è coperto o fuori schermo, o la scheda non è in vista,
-      il film si ferma e non costa niente. Riparte dove era.
+   1. Il disegno c'è da sempre, già in movimento: il footer è un foglio fermo
+      che il video scopre salendo, e quello che c'è sotto il foglio non si
+      disegna, si trova. Appena il bordo del video ne lascia scoperto un
+      pezzo, il film gira.
+   2. È un film a passo uno: otto fotogrammi al secondo circa, e a ogni
+      fotogramma la mano ripassa le linee in modo appena diverso, così le
+      linee "bollono". Il surfista sale e scende sull'onda e si inclina un
+      poco, le onde ondeggiano una dopo l'altra, gli spruzzi frizzano. Un
+      giro dura 3.2 secondi.
+   3. Quando il footer è coperto o fuori schermo, o la scheda non è in vista,
+      il film si ferma e non costa niente. Riparte dal fotogramma in cui si
+      era fermato.
 
    IL DISEGNO È UN RICALCO dell'immagine del footer (il PNG del surfista, 1296
    per 1296), fatto una volta sola fuori dal sito: le linee sono qui sotto, in
@@ -38,7 +37,6 @@ var VARIANTI   = 3;     /* quante versioni della stessa linea si alternano:
                            è il "bollire". 3 è il classico dei disegni animati */
 var TRATTO_PX  = 1.25;  /* spessore della matita sullo schermo, in pixel       */
 var MANO       = 3;     /* quanto trema la mano, in pixel dell'immagine        */
-var PARTENZA   = 1.6;   /* secondi in cui il movimento cresce da fermo         */
 
 /* il movimento, in pixel e gradi dell'immagine originale (1296 di lato) */
 var SURF_SU    = 9;     /* di quanto il surfista sale e scende                 */
@@ -232,8 +230,7 @@ function init(){
       if(!gs[id]) gs[id] = '';
       var rnd = prng(7919 * (l.i + 1) + 104729 * v);
       schizzo(l.p, l.chiuso, l.tratteggio ? MANO * 0.5 : MANO, l.tratteggio ? 1 : 2, rnd).forEach(function(t){
-        gs[id] += '<path d="' + t.d + '"' + (t.ps ? ' class="cs-r" opacity="0.75"' : '') +
-          (v === 0 ? ' pathLength="1" stroke-dasharray="1 1.1" stroke-dashoffset="1.05" data-l="' + l.i + '"' : '') + '/>';
+        gs[id] += '<path d="' + t.d + '"' + (t.ps ? ' class="cs-r" opacity="0.75"' : '') + '/>';
       });
     });
     Object.keys(gs).forEach(function(id){ html += '<g data-p="' + id + '">' + gs[id] + '</g>'; });
@@ -292,64 +289,18 @@ function init(){
 
   /* ── quando si vede ─────────────────────────────────────────────────
      Il footer sta fermo in fondo allo schermo e lo scopre il bordo basso del
-     video che sale. "Scoperta" vuol dire: l'immagine è tutta dentro lo
-     schermo e il video le è passato sopra. */
+     video che sale. Il film gira appena il video ne ha scoperto un pezzo, e
+     solo finché l'immagine è almeno in parte dentro lo schermo. */
   function video(){
     var sec = document.querySelector('.cape-open');
     return sec && (sec.querySelector('.cape-open-stage') || sec);
   }
-  function scoperta(tutta){
+  function inVista(){
     if(svg.style.display === 'none' || document.hidden) return false;
     var r = img.getBoundingClientRect(), vh = window.innerHeight;
     if(r.height < 10 || r.bottom <= 0 || r.top >= vh) return false;
-    if(tutta && (r.top < 0 || r.bottom > vh + 1)) return false;
     var b = video();
-    if(b){
-      var giu = b.getBoundingClientRect().bottom;
-      if(tutta ? giu > r.top + r.height * 0.15 : giu >= r.bottom - 4) return false;
-    }
-    return true;
-  }
-
-  /* ── il primo disegno ───────────────────────────────────────────────
-     Tre finestre di tempo che si accavallano: il surfista, poi le onde da
-     sinistra a destra, poi gli spruzzi che si aprono verso sinistra. Dentro
-     una finestra ogni linea parte in proporzione a quanta strada la matita
-     ha già fatto, e dura in proporzione a quanto è lunga. */
-  var disegnato = false, pronto = false;
-
-  function disegna(){
-    disegnato = true;
-    var finestre = [
-      { g: 0, da: 0,    per: 1.1, ord: function(a, b){ return a.cy - b.cy; } },
-      { g: 2, da: 0.7,  per: 1.3, ord: function(a, b){ return a.cx - b.cx; } },
-      { g: 1, da: 1.15, per: 1.1, ord: function(a, b){ return b.cx - a.cx; } }
-    ];
-    var quando = {}, fine = 0;
-    finestre.forEach(function(f){
-      var ls = linee.filter(function(l){ return l.g === f.g; }).sort(f.ord);
-      var tot = ls.reduce(function(s, l){ return s + l.len; }, 0) || 1, fatta = 0;
-      ls.forEach(function(l){
-        var dur = Math.max(0.08, Math.min(0.5, l.len / tot * f.per * 3));
-        quando[l.i] = { t: f.da + fatta / tot * f.per, d: dur };
-        fatta += l.len;
-      });
-    });
-    [].forEach.call(strati[0].querySelectorAll('path'), function(p){
-      var q = quando[+p.getAttribute('data-l')];
-      if(!q) return;
-      var t = q.t + (p.classList.contains('cs-r') ? 0.06 : 0);
-      var a = p.animate([{ strokeDashoffset: '1.05' }, { strokeDashoffset: '0' }],
-                        { duration: q.d * 1000, delay: t * 1000, easing: 'cubic-bezier(.42,.05,.32,1)', fill: 'both' });
-      fine = Math.max(fine, t + q.d);
-      a.onfinish = function(){
-        p.removeAttribute('stroke-dasharray');
-        p.removeAttribute('stroke-dashoffset');
-        p.removeAttribute('pathLength');
-        try{ a.cancel(); }catch(e){}
-      };
-    });
-    setTimeout(function(){ pronto = true; t0 = 0; sveglia(); }, (fine + 0.3) * 1000);
+    return !b || b.getBoundingClientRect().bottom < r.bottom - 4;
   }
 
   /* ── il film ────────────────────────────────────────────────────────
@@ -357,13 +308,10 @@ function init(){
      è il passo a scatti che lo fa sembrare fatto a mano. Il tempo si conta
      solo mentre il film gira, così quando riparte riprende dal fotogramma in
      cui si era fermato. */
-  var fotogramma = 0, suo = 0, t0 = 0, ultimo = 0, vissuto = 0, girando = false;
-
-  function cl01(v){ return v < 0 ? 0 : (v > 1 ? 1 : v); }
+  var fotogramma = 0, suo = 0, ultimo = 0, girando = false;
 
   function scatta(){
     var fi = 2 * Math.PI * (fotogramma % GIRO) / GIRO;
-    var k = cl01(vissuto / PARTENZA); k = k * k * (3 - 2 * k);
 
     strati[suo].classList.remove('is-su');
     suo = fotogramma % VARIANTI;
@@ -372,15 +320,15 @@ function init(){
     ordine.forEach(function(o){
       var tr;
       if(o.id === 's'){
-        tr = 'translate(0 ' + f1(SURF_SU * k * Math.sin(fi)) + ') rotate(' +
-             f1(SURF_GIRA * k * Math.sin(fi + 0.9)) + ' ' + PERNO[0] + ' ' + PERNO[1] + ')';
+        tr = 'translate(0 ' + f1(SURF_SU * Math.sin(fi)) + ') rotate(' +
+             f1(SURF_GIRA * Math.sin(fi + 0.9)) + ' ' + PERNO[0] + ' ' + PERNO[1] + ')';
       } else if(o.l){
         var psi = fi + o.l.cx / LATO * 2 * Math.PI * 0.9;
-        tr = 'translate(' + f1(ONDA_VA * k * Math.sin(psi + 0.5)) + ' ' + f1(ONDA_VA * 0.4 * k * Math.cos(psi)) + ') rotate(' +
-             f1(ONDA_GIRA * k * Math.sin(psi)) + ' ' + o.l.top[0] + ' ' + o.l.top[1] + ')';
+        tr = 'translate(' + f1(ONDA_VA * Math.sin(psi + 0.5)) + ' ' + f1(ONDA_VA * 0.4 * Math.cos(psi)) + ') rotate(' +
+             f1(ONDA_GIRA * Math.sin(psi)) + ' ' + o.l.top[0] + ' ' + o.l.top[1] + ')';
       } else {
         var ps = fi * 2 + o.fascia * 1.1;
-        tr = 'translate(' + f1(-SPRUZZI_VA * k * (0.5 + 0.5 * Math.sin(ps))) + ' ' + f1(-SPRUZZI_VA * 0.6 * k * Math.sin(ps + 1.3)) + ')';
+        tr = 'translate(' + f1(-SPRUZZI_VA * (0.5 + 0.5 * Math.sin(ps))) + ' ' + f1(-SPRUZZI_VA * 0.6 * Math.sin(ps + 1.3)) + ')';
       }
       o.gs[suo].setAttribute('transform', tr);
     });
@@ -389,11 +337,8 @@ function init(){
 
   function giro(ora){
     girando = false;
-    if(!pronto || !scoperta(false)){ t0 = 0; return; }
-    if(!t0){ t0 = ora; ultimo = ora; }
-    var passo = 1000 / FPS;
-    if(ora - ultimo >= passo){
-      vissuto += (ora - ultimo) / 1000;
+    if(!inVista()){ ultimo = 0; return; }
+    if(!ultimo || ora - ultimo >= 1000 / FPS){
       ultimo = ora;
       scatta();
     }
@@ -406,23 +351,12 @@ function init(){
     requestAnimationFrame(giro);
   }
 
-  /* ── chi tiene d'occhio ─────────────────────────────────────────────
-     Prima del disegno si guarda a ogni scroll se l'immagine si è scoperta.
-     Dopo, lo scroll serve solo a risvegliare il film quando torna in vista. */
-  var attesa = false;
-  function guarda(){
-    if(attesa) return;
-    attesa = true;
-    requestAnimationFrame(function(){
-      attesa = false;
-      if(!disegnato){ if(scoperta(true)) disegna(); return; }
-      if(pronto) sveglia();
-    });
-  }
-  addEventListener('scroll', guarda, { passive: true });
-  addEventListener('resize', guarda, { passive: true });
-  document.addEventListener('visibilitychange', guarda);
-  guarda();
+  /* Il film si ferma da solo quando non è in vista; a risvegliarlo ci pensano
+     lo scroll, il resize e il ritorno sulla scheda. */
+  addEventListener('scroll', sveglia, { passive: true });
+  addEventListener('resize', sveglia, { passive: true });
+  document.addEventListener('visibilitychange', sveglia);
+  sveglia();
 
   window.capePatti && capePatti.dichiara('surfista', {
     leggo: [['.cape-open-stage', '', 'il bordo basso del video che sale dice quando il surfista è scoperto']]
@@ -430,8 +364,7 @@ function init(){
 
   window.capeSurfista = {
     stato: function(){
-      return { disegnato: disegnato, film: pronto, fotogramma: fotogramma,
-               linee: linee.length, pezzi: ordine.length };
+      return { inVista: inVista(), fotogramma: fotogramma, linee: linee.length, pezzi: ordine.length };
     }
   };
 }
