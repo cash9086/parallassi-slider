@@ -84,16 +84,17 @@ var START_V    = 0.80;
 var EASE       = 'cubic-bezier(.16,1,.3,1)';
 
 /* L'invito del bottone: quando è fermo al suo posto, ogni tanto le lettere
-   prendono un filo d'aria una dopo l'altra, da sinistra a destra, come
-   un'onda che passa, e tornano. Deve quasi non vedersi. */
+   si staccano una alla volta, da sinistra a destra: ognuna scivola di un
+   soffio verso destra e torna, e passa il testimone alla successiva. Le
+   altre stanno ferme. Non è letter-spacing apposta: allargare una lettera
+   sposta tutte quelle dopo, e la parola si muove come un blocco. */
 var INVITO_OGNI  = 7;     /* secondi fra un invito e l'altro              */
 var INVITO_PRIMO = 3.5;   /* il primo, dopo che il bottone è salito       */
-var INVITO_EM    = 0.22;  /* quanto si apre ogni lettera, in em           */
-var INVITO_DUR   = 0.42;  /* secondi di una lettera: apertura e ritorno.
-                             Corto apposta: così sono aperte due o tre
-                             lettere alla volta, e lo spazio si vede
-                             correre invece di gonfiare tutta la parola. */
-var INVITO_PASSO = 0.075; /* secondi fra una lettera e la successiva      */
+var INVITO_EM    = 0.16;  /* di quanto scivola ogni lettera, in em        */
+var INVITO_DUR   = 0.34;  /* secondi di una lettera: andata e ritorno     */
+var INVITO_PASSO = 0.2;   /* secondi fra una lettera e la successiva: poco
+                             più di metà della sua corsa, così ce n'è
+                             sempre una sola in movimento.                */
 
 /* ── da qui in giù non ci sono numeri da girare ──────────────────────── */
 
@@ -814,6 +815,8 @@ function init(){
       for(var li = 0; li < scritta.length; li++){
         var sp = document.createElement('span');
         sp.setAttribute('aria-hidden', 'true');
+        sp.style.display = 'inline-block';
+        sp.style.whiteSpace = 'pre';
         sp.textContent = scritta[li];
         bottone.appendChild(sp);
         if(scritta[li].trim()) lettere.push(sp);
@@ -840,14 +843,14 @@ function init(){
     if(ora < prossimoInvito) return;
     var r = cta.getBoundingClientRect();
     if(r.bottom < 0 || r.top > window.innerHeight) return;
-    var cs = getComputedStyle(bottone);
-    var base = parseFloat(cs.letterSpacing) || 0, corpo = parseFloat(cs.fontSize) || 12;
-    var onda = [], bersagli = lettere.length ? lettere : [bottone], restano = bersagli.length;
-    bersagli.forEach(function(el, i){
+    if(!lettere.length) return;
+    var corpo = parseFloat(getComputedStyle(bottone).fontSize) || 12;
+    var onda = [], restano = lettere.length, dx = (corpo * INVITO_EM).toFixed(2) + 'px';
+    lettere.forEach(function(el, i){
       var a = el.animate([
-        { letterSpacing: base + 'px' },
-        { letterSpacing: (base + corpo * INVITO_EM) + 'px', offset: 0.5 },
-        { letterSpacing: base + 'px' }
+        { transform: 'translateX(0)' },
+        { transform: 'translateX(' + dx + ')', offset: 0.45 },
+        { transform: 'translateX(0)' }
       ], { duration: INVITO_DUR * 1000, delay: i * INVITO_PASSO * 1000, easing: 'ease-in-out' });
       a.onfinish = function(){ if(--restano === 0 && invito === onda) invito = null; };
       onda.push(a);
