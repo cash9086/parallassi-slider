@@ -90,11 +90,12 @@ var EASE       = 'cubic-bezier(.16,1,.3,1)';
    sposta tutte quelle dopo, e la parola si muove come un blocco. */
 var INVITO_OGNI  = 7;     /* secondi fra un invito e l'altro              */
 var INVITO_PRIMO = 3.5;   /* il primo, dopo che il bottone è salito       */
-var INVITO_EM    = 0.16;  /* di quanto scivola ogni lettera, in em        */
-var INVITO_DUR   = 0.34;  /* secondi di una lettera: andata e ritorno     */
-var INVITO_PASSO = 0.2;   /* secondi fra una lettera e la successiva: poco
-                             più di metà della sua corsa, così ce n'è
-                             sempre una sola in movimento.                */
+var INVITO_EM    = 0.07;  /* di quanto scivola ogni lettera, in em        */
+var INVITO_DUR   = 0.9;   /* secondi di una lettera: andata e ritorno     */
+var INVITO_PASSO = 0.07;  /* secondi fra una lettera e la successiva. Molto
+                             meno della corsa: le vicine si muovono
+                             insieme, un po' sfasate, e l'occhio legge una
+                             gobba morbida che scorre, non dei passi.     */
 
 /* ── da qui in giù non ci sono numeri da girare ──────────────────────── */
 
@@ -848,10 +849,10 @@ function init(){
     var onda = [], restano = lettere.length, dx = (corpo * INVITO_EM).toFixed(2) + 'px';
     lettere.forEach(function(el, i){
       var a = el.animate([
-        { transform: 'translateX(0)' },
-        { transform: 'translateX(' + dx + ')', offset: 0.45 },
+        { transform: 'translateX(0)', easing: 'cubic-bezier(.37,0,.63,1)' },
+        { transform: 'translateX(' + dx + ')', offset: 0.5, easing: 'cubic-bezier(.37,0,.63,1)' },
         { transform: 'translateX(0)' }
-      ], { duration: INVITO_DUR * 1000, delay: i * INVITO_PASSO * 1000, easing: 'ease-in-out' });
+      ], { duration: INVITO_DUR * 1000, delay: i * INVITO_PASSO * 1000, easing: 'linear' });
       a.onfinish = function(){ if(--restano === 0 && invito === onda) invito = null; };
       onda.push(a);
     });
