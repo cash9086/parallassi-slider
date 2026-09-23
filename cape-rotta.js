@@ -84,11 +84,13 @@ var START_V    = 0.80;
 var EASE       = 'cubic-bezier(.16,1,.3,1)';
 
 /* L'invito del bottone: quando è fermo al suo posto, ogni tanto le lettere
-   prendono un filo d'aria e tornano. Deve quasi non vedersi. */
+   prendono un filo d'aria una dopo l'altra, da sinistra a destra, come
+   un'onda che passa, e tornano. Deve quasi non vedersi. */
 var INVITO_OGNI  = 7;     /* secondi fra un invito e l'altro              */
 var INVITO_PRIMO = 3.5;   /* il primo, dopo che il bottone è salito       */
-var INVITO_EM    = 0.06;  /* quanto si allargano le lettere, in em        */
-var INVITO_DUR   = 2.2;   /* secondi: apertura e ritorno                  */
+var INVITO_EM    = 0.08;  /* quanto si apre ogni lettera, in em           */
+var INVITO_DUR   = 1.1;   /* secondi di una lettera: apertura e ritorno   */
+var INVITO_PASSO = 0.05;  /* secondi fra una lettera e la successiva      */
 
 /* ── da qui in giù non ci sono numeri da girare ──────────────────────── */
 
@@ -796,11 +798,35 @@ function init(){
   /* ── l'invito ───────────────────────────────────────────────────────── */
 
   var bottone = cta && (cta.querySelector('a, button') || slitta), sopra = false;
-  var prossimoInvito = 0, invito = null;
+  var prossimoInvito = 0, invito = null, lettere = [];
+
+  /* L'onda ha bisogno delle lettere una per una. Si spezza il testo solo se
+     il bottone è testo e basta; il testo intero resta come etichetta per chi
+     usa un lettore di schermo. */
+  if(bottone && !bottone.children.length){
+    var scritta = bottone.textContent;
+    if(scritta.trim()){
+      bottone.setAttribute('aria-label', scritta.trim());
+      bottone.textContent = '';
+      for(var li = 0; li < scritta.length; li++){
+        var sp = document.createElement('span');
+        sp.setAttribute('aria-hidden', 'true');
+        sp.textContent = scritta[li];
+        bottone.appendChild(sp);
+        if(scritta[li].trim()) lettere.push(sp);
+      }
+    }
+  }
+
+  function fermaOnda(){
+    (invito || []).forEach(function(a){ try{ a.cancel(); }catch(e){} });
+    invito = null;
+  }
+
   if(bottone){
     bottone.addEventListener('mouseenter', function(){
       sopra = true;
-      if(invito){ try{ invito.cancel(); }catch(e){} invito = null; }
+      fermaOnda();
     });
     bottone.addEventListener('mouseleave', function(){ sopra = false; });
   }
@@ -813,13 +839,17 @@ function init(){
     if(r.bottom < 0 || r.top > window.innerHeight) return;
     var cs = getComputedStyle(bottone);
     var base = parseFloat(cs.letterSpacing) || 0, corpo = parseFloat(cs.fontSize) || 12;
-    var a = bottone.animate([
-      { letterSpacing: base + 'px' },
-      { letterSpacing: (base + corpo * INVITO_EM) + 'px', offset: 0.45 },
-      { letterSpacing: base + 'px' }
-    ], { duration: INVITO_DUR * 1000, easing: 'cubic-bezier(.45,0,.25,1)' });
-    invito = a;
-    a.onfinish = a.oncancel = function(){ if(invito === a) invito = null; };
+    var onda = [], bersagli = lettere.length ? lettere : [bottone], restano = bersagli.length;
+    bersagli.forEach(function(el, i){
+      var a = el.animate([
+        { letterSpacing: base + 'px' },
+        { letterSpacing: (base + corpo * INVITO_EM) + 'px', offset: 0.45 },
+        { letterSpacing: base + 'px' }
+      ], { duration: INVITO_DUR * 1000, delay: i * INVITO_PASSO * 1000, easing: 'cubic-bezier(.45,0,.25,1)' });
+      a.onfinish = function(){ if(--restano === 0 && invito === onda) invito = null; };
+      onda.push(a);
+    });
+    invito = onda;
     prossimoInvito = ora + INVITO_OGNI * 1000;
   }
 
