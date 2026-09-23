@@ -88,9 +88,12 @@ var EASE       = 'cubic-bezier(.16,1,.3,1)';
    un'onda che passa, e tornano. Deve quasi non vedersi. */
 var INVITO_OGNI  = 7;     /* secondi fra un invito e l'altro              */
 var INVITO_PRIMO = 3.5;   /* il primo, dopo che il bottone è salito       */
-var INVITO_EM    = 0.08;  /* quanto si apre ogni lettera, in em           */
-var INVITO_DUR   = 1.1;   /* secondi di una lettera: apertura e ritorno   */
-var INVITO_PASSO = 0.05;  /* secondi fra una lettera e la successiva      */
+var INVITO_EM    = 0.22;  /* quanto si apre ogni lettera, in em           */
+var INVITO_DUR   = 0.42;  /* secondi di una lettera: apertura e ritorno.
+                             Corto apposta: così sono aperte due o tre
+                             lettere alla volta, e lo spazio si vede
+                             correre invece di gonfiare tutta la parola. */
+var INVITO_PASSO = 0.075; /* secondi fra una lettera e la successiva      */
 
 /* ── da qui in giù non ci sono numeri da girare ──────────────────────── */
 
@@ -843,9 +846,9 @@ function init(){
     bersagli.forEach(function(el, i){
       var a = el.animate([
         { letterSpacing: base + 'px' },
-        { letterSpacing: (base + corpo * INVITO_EM) + 'px', offset: 0.45 },
+        { letterSpacing: (base + corpo * INVITO_EM) + 'px', offset: 0.5 },
         { letterSpacing: base + 'px' }
-      ], { duration: INVITO_DUR * 1000, delay: i * INVITO_PASSO * 1000, easing: 'cubic-bezier(.45,0,.25,1)' });
+      ], { duration: INVITO_DUR * 1000, delay: i * INVITO_PASSO * 1000, easing: 'ease-in-out' });
       a.onfinish = function(){ if(--restano === 0 && invito === onda) invito = null; };
       onda.push(a);
     });
