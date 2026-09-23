@@ -83,6 +83,13 @@ var DUR        = 1000;
 var START_V    = 0.80;
 var EASE       = 'cubic-bezier(.16,1,.3,1)';
 
+/* L'invito del bottone: quando è fermo al suo posto, ogni tanto le lettere
+   prendono un filo d'aria e tornano. Deve quasi non vedersi. */
+var INVITO_OGNI  = 7;     /* secondi fra un invito e l'altro              */
+var INVITO_PRIMO = 3.5;   /* il primo, dopo che il bottone è salito       */
+var INVITO_EM    = 0.06;  /* quanto si allargano le lettere, in em        */
+var INVITO_DUR   = 2.2;   /* secondi: apertura e ritorno                  */
+
 /* ── da qui in giù non ci sono numeri da girare ──────────────────────── */
 
 var SEZ   = '.cape-rotta';
@@ -465,7 +472,10 @@ function vesti(){
   var st = document.createElement('style');
   st.id = 'cape-rotta-css';
   st.textContent = [
-    '.cape-rotta-riga{overflow-x:clip;overflow-y:visible}',
+    /* La riga deve essere larga quanto la sezione, qualunque sia
+       l'allineamento nel Designer: con Align center si allargherebbe quanto
+       il nastro, migliaia di pixel, e finirebbe centrata fuori schermo. */
+    '.cape-rotta-riga{overflow-x:clip;overflow-y:visible;align-self:stretch;width:auto;min-width:0;max-width:100%}',
     '.cape-rotta-nastro{display:flex;width:max-content;will-change:transform}',
     '.cape-rotta-giro{display:flex;flex:none}',
     '.cape-rotta-giro>*{flex:none;white-space:nowrap;position:relative}',
@@ -571,7 +581,7 @@ function init(){
       n.w = n.riga.clientWidth;
       n.h = n.riga.clientHeight;
       n.largo = n.giro.getBoundingClientRect().width || 1;
-      var copie = Math.ceil(n.w / n.largo) + 1;
+      var copie = Math.ceil(Math.max(n.w, window.innerWidth) / n.largo) + 1;
       for(var i = 1; i < copie; i++){
         var c = n.giro.cloneNode(true);
         c.setAttribute('aria-hidden', 'true');
@@ -671,6 +681,7 @@ function init(){
     cta.classList.add('is-armed');
     slitta.style.transform = 'translateY(' + giu(slitta) + ')';
     armato = true;
+    prossimoInvito = 0;
   }
 
   function sali(){
@@ -708,7 +719,11 @@ function init(){
     disegnato = true;
     var fine = 0, piani = [];
     nastri.forEach(function(n){
-      var rr = n.riga.getBoundingClientRect(), W = rr.width || 1;
+      /* la finestra è la parte della riga che si vede davvero */
+      var q0 = n.riga.getBoundingClientRect();
+      var rr = { left: Math.max(q0.left, 0), right: Math.min(q0.right, window.innerWidth) };
+      rr.width = Math.max(1, rr.right - rr.left);
+      var W = rr.width;
       [].forEach.call(n.nastro.querySelectorAll('.cape-rotta-giro>*'), function(v){
         var q = v.getBoundingClientRect();
         if(q.right < rr.left - 40 || q.left > rr.right + 40) return;
@@ -750,6 +765,36 @@ function init(){
     sali();
   }
 
+  /* ── l'invito ───────────────────────────────────────────────────────── */
+
+  var bottone = cta && (cta.querySelector('a, button') || slitta), sopra = false;
+  var prossimoInvito = 0, invito = null;
+  if(bottone){
+    bottone.addEventListener('mouseenter', function(){
+      sopra = true;
+      if(invito){ try{ invito.cancel(); }catch(e){} invito = null; }
+    });
+    bottone.addEventListener('mouseleave', function(){ sopra = false; });
+  }
+
+  function invita(ora){
+    if(!bottone || armato || corsa || sopra || invito || document.hidden) return;
+    if(!prossimoInvito){ prossimoInvito = ora + INVITO_PRIMO * 1000; return; }
+    if(ora < prossimoInvito) return;
+    var r = cta.getBoundingClientRect();
+    if(r.bottom < 0 || r.top > window.innerHeight) return;
+    var cs = getComputedStyle(bottone);
+    var base = parseFloat(cs.letterSpacing) || 0, corpo = parseFloat(cs.fontSize) || 12;
+    var a = bottone.animate([
+      { letterSpacing: base + 'px' },
+      { letterSpacing: (base + corpo * INVITO_EM) + 'px', offset: 0.45 },
+      { letterSpacing: base + 'px' }
+    ], { duration: INVITO_DUR * 1000, easing: 'cubic-bezier(.45,0,.25,1)' });
+    invito = a;
+    a.onfinish = a.oncancel = function(){ if(invito === a) invito = null; };
+    prossimoInvito = ora + INVITO_OGNI * 1000;
+  }
+
   /* ── lo scorrimento ─────────────────────────────────────────────────── */
 
   var tPrima = 0, yPrima = null, spinta = 0;
@@ -764,6 +809,7 @@ function init(){
       var r = cta.getBoundingClientRect();
       if(r.top < window.innerHeight * START_V && r.bottom > 0) sali();
     }
+    if(disegnato) invita(ora);
 
     var y = window.scrollY || window.pageYOffset;
     var v = (yPrima === null || !dt) ? 0 : Math.abs(y - yPrima) / dt;
