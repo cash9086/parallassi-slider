@@ -288,9 +288,9 @@ var SCENE = [
         .concat([].slice.call(document.querySelectorAll('.cape-hs-palm img, .cape-leaves-top')));
     },
     gruppi: function(s, W, H, U){
-      var ws = 5.2 * U, wf = 10 * U, hf = 3.2 * U;
+      var ws = 7.8 * U, wf = 10 * U, hf = 3.2 * U;
       return [
-        [segno('sole', W * 0.075, H * 0.2, ws, ws, 0.85, 0)],
+        [segno('sole', W * 0.085, H * 0.22, ws, ws, 0.85, 0)],
         [segno('freccia', W * 0.95 - wf / 2, H * 0.5, wf, hf, 0.6, 0.3)]
       ];
     }
