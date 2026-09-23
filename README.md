@@ -9,6 +9,7 @@ custom code della pagina, perché là lo spazio è finito.
 | `cape-open.js` | la sezione `.cape-open`: la tendina del video e le righe del titolo | ~6 KB |
 | `camera-oscura.js` | la sezione `.stage-wrap`: bruciatura, frase, firma, sviluppo, ritiro | ~21 KB |
 | `cape-studio-entrata.js` | la sezione studio: bianca, poi tutto insieme, una volta sola | ~15 KB |
+| `cape-rotta.js` | la sezione fra studio e cape-open: città e coordinate scritte a schizzo, in due righe che scorrono | ~30 KB |
 
 `reel-salita.js` e `cape-open.js` non hanno dipendenze — niente GSAP, niente
 jQuery. `camera-oscura.js` vuole GSAP e ScrollTrigger già caricati.
@@ -449,3 +450,36 @@ Mentre il montaggio gira, sul tag `html` compare `is-consegna`: è così che la
 planata dello studio — che sta nel custom code della pagina — sa di dover stare
 ferma. Il nome è quello vecchio apposta: rinominarla vorrebbe dire andare a
 cambiare una riga là dentro a mano per non guadagnare niente.
+
+---
+
+## `cape-rotta.js`
+
+La sezione fra lo studio e cape-open: due righe di città e coordinate che la
+matita scrive a schizzo la prima volta che entrano in vista — l'alta dal bordo
+destro, la bassa dal sinistro — e poi scorrono in versi opposti. In mezzo un
+bottone che sale a tendina ogni volta che rientra. Nessuna dipendenza.
+
+### Il markup che si aspetta
+
+| Selettore | Serve a | Se manca |
+|---|---|---|
+| `.cape-rotta` | la sezione | esce, zitto |
+| `.cape-rotta-riga.is-alto` / `.is-basso` | le due righe; `is-basso` scorre verso destra | la riga che non c'è non c'è |
+| un testo dentro la riga | una voce: città o coordinata | — |
+| `.cape-rotta-segno.is-stella` / `.is-croce` | un segno fra due voci, div vuoto | — |
+| `.cape-rotta-cta` | il contenitore del bottone | niente tendina |
+
+Font, corpo, colore e gap stanno nel Designer. Il codice ricalca il testo come
+il browser lo disegna, quindi segue qualunque cambio fatto lì. Il CSS che gli
+serve lo mette il file stesso.
+
+### Tre cose che non si deducono leggendo
+
+- **Il ricalco si controlla da solo.** Se la larghezza del ricalco si discosta
+  di più del 4% dal testo vero, quella voce resta testo e compare in
+  dissolvenza. Succede con un font che non arriva o con proprietà
+  OpenType che la tela non conosce. In console c'è un avviso.
+- **Il lavoro è a pezzi.** Parte quando mancano tre schermate alla sezione, una
+  voce per volta nei momenti liberi del browser.
+- **Una sola volta.** Il disegno non si rigioca; il bottone sì.
