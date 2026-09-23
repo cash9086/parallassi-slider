@@ -73,6 +73,9 @@ var SPINTA_MAX = 7;     /* la spinta non supera questo multiplo della
                            crociera, per quanto forte si scrolli.         */
 var RIPOSO     = 0.55;  /* secondi in cui la spinta si spegne.            */
 
+var TENUTA_MIN_W = 992; /* la tenuta c'è da qui in su, come nello studio:
+                           sotto non c'è Lenis e lo scroll col pollice non
+                           si ferma.                                      */
 var SOGLIA     = 0.9;   /* quanta parte delle due righe deve essere in vista
                            perché la matita parta.                        */
 
@@ -737,6 +740,51 @@ function init(){
 
   var disegnato = false, fineDisegno = 0;
 
+  /* ── trattieni() ─────────────────────────────────────────────────────
+     La stessa tenuta dello studio. Una volta sola: la prima volta, finché
+     la matita non ha finito, la sezione non si lascia superare. Arrivati
+     con lo scroll al punto in cui è tutta in vista — il bordo alto sul
+     bordo alto dello schermo, o centrata se è più bassa dello schermo — si
+     prende il volante a livello MURO, lo scroll si ferma e la pagina si
+     posa esattamente lì. Finito il disegno si molla.
+
+     Il volante ha una scadenza sua di 2.5 secondi e il disegno può durarne
+     di più: la presa si rinnova finché serve. */
+  var VOLANTE = 'rotta-tenuta', tenutaSpesa = false, tenendo = false, rinnovo = 0;
+
+  function quotaTenuta(){
+    var y = window.scrollY || window.pageYOffset;
+    var r = sez.getBoundingClientRect();
+    return Math.round(y + r.top + (r.height - window.innerHeight) / 2 * (r.height < window.innerHeight ? 1 : 0));
+  }
+
+  function trattieni(ora){
+    if(tenutaSpesa || tenendo) return;
+    if(window.innerWidth < TENUTA_MIN_W){ tenutaSpesa = true; return; }
+    if(ora >= fineDisegno){ tenutaSpesa = true; return; }
+    var y = window.scrollY || window.pageYOffset, q = quotaTenuta();
+    if(y < q) return;
+    if(!window.capeScroll || !capeScroll.prendi(VOLANTE, capeScroll.MURO)){ tenutaSpesa = true; return; }
+    tenendo = true;
+    rinnovo = ora;
+    capeScroll.ferma(VOLANTE);
+    capeScroll.vaA(VOLANTE, q, { immediate: true });
+  }
+
+  function tieni(ora){
+    if(!tenendo) return;
+    if(ora >= fineDisegno){
+      tenendo = false;
+      tenutaSpesa = true;
+      capeScroll.molla(VOLANTE);
+      return;
+    }
+    if(ora - rinnovo > 1500){
+      rinnovo = ora;
+      if(!capeScroll.prendi(VOLANTE, capeScroll.MURO)){ tenendo = false; tenutaSpesa = true; }
+    }
+  }
+
   function inVista(){
     var vh = window.innerHeight, a = null, b = null;
     righe.forEach(function(r){
@@ -870,6 +918,7 @@ function init(){
     tPrima = ora;
 
     if(pronti && !disegnato && inVista()) disegna();
+    if(disegnato && !tenutaSpesa){ trattieni(ora); tieni(ora); }
     if(slitta && armato && disegnato){
       var r = cta.getBoundingClientRect();
       if(r.top < window.innerHeight * START_V && r.bottom > 0) sali();
