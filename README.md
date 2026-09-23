@@ -10,7 +10,7 @@ custom code della pagina, perché là lo spazio è finito.
 | `camera-oscura.js` | la sezione `.stage-wrap`: bruciatura, frase, firma, sviluppo, ritiro | ~21 KB |
 | `cape-studio-entrata.js` | la sezione studio: bianca, poi tutto insieme, una volta sola | ~15 KB |
 | `cape-rotta.js` | la sezione fra studio e cape-open: città e coordinate scritte a schizzo, in due righe che scorrono | ~30 KB |
-| `cape-matita.js` | i segni a matita della home — sole e freccia sulla slide bianca, stelle e luna sulla nera, frecce nello studio — che si disegnano una volta e se ne vanno | ~28 KB |
+| `cape-matita.js` | i segni a matita della home — sole e uccellini sulla slide bianca, luna e stelle sulla nera, frecce nello studio — che si disegnano una volta e se ne vanno | ~28 KB |
 
 `reel-salita.js` e `cape-open.js` non hanno dipendenze — niente GSAP, niente
 jQuery. `camera-oscura.js` vuole GSAP e ScrollTrigger già caricati.

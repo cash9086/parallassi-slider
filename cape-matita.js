@@ -1,14 +1,14 @@
 /* parallassi-slider — cape-matita.js
-   I segni a matita della home: un sole, una freccia, tre stelle e una luna,
-   tre frecce verso l'opera. Ognuno si disegna UNA volta sola nella vita
+   I segni a matita della home: un sole e tre uccellini, una luna e tre
+   stelle, tre frecce verso l'opera. Ognuno si disegna UNA volta sola nella vita
    della pagina, resta un secondo e se ne va: la coda del tratto insegue la
    punta, nello stesso verso in cui è stato disegnato.
 
    DOVE E QUANDO
-     slide bianca di .cape-hs-wrap   sole in alto a sinistra, freccia a destra
-                                     verso lo scroll. Partono quando la slide
-                                     è ferma al suo posto e il ponte non la
-                                     copre più.
+     slide bianca di .cape-hs-wrap   sole in alto a sinistra, tre uccellini
+                                     attorno alla foto. Partono quando la
+                                     slide è ferma al suo posto e il ponte non
+                                     la copre più.
      slide nera di .cape-hs-wrap     tre stelle e una luna attorno alla foto,
                                      in bianco. Partono quando la slide è nera
                                      e ferma, e solo se la polvere non ha già
@@ -207,11 +207,12 @@ var FORME = {
     }
     return tr;
   },
-  freccia: function(w, h){
-    return [
-      { p: quad([w * 0.02, h * 0.62], [w * 0.5, h * 0.30], [w * 0.93, h * 0.5], 28), chiuso: false },
-      { p: [[w * 0.80, h * 0.10], [w * 0.955, h * 0.5], [w * 0.79, h * 0.92]], chiuso: false }
-    ];
+  /* Un uccello in volo: una "m" morbida in un tratto solo, le due ali che si
+     incontrano un po' più in basso. Ognuno inclinato un poco a modo suo. */
+  uccello: function(w, h, rnd){
+    var ala1 = quad([w * 0.02, h * 0.70], [w * 0.24, h * -0.30], [w * 0.5, h * 0.78], 14);
+    var ala2 = quad([w * 0.5, h * 0.78], [w * 0.74, h * -0.36], [w * 0.98, h * 0.55], 14).slice(1);
+    return [{ p: ruota(ala1.concat(ala2), w / 2, h / 2, (rnd() - 0.5) * 0.3), chiuso: false }];
   },
   diagonale: function(w, h){
     return [
@@ -246,9 +247,9 @@ var FORME = {
 };
 
 /* quanto trema la mano, in frazioni del lato corto del segno */
-var MANO = { sole: 0.03, freccia: 0.035, diagonale: 0.04, stella: 0.07, luna: 0.04 };
+var MANO = { sole: 0.03, uccello: 0.06, diagonale: 0.04, stella: 0.07, luna: 0.04 };
 
-var NOMI = { sole: 'il sole', freccia: 'la freccia', diagonale: 'una freccia dello studio',
+var NOMI = { sole: 'il sole', uccello: 'un uccellino', diagonale: 'una freccia dello studio',
              stella: 'una stella', luna: 'la luna' };
 
 
@@ -273,6 +274,17 @@ function segno(forma, cx, cy, w, h, dur, at){
   return { forma: forma, x: cx - w / 2, y: cy - h / 2, w: w, h: h, dur: dur, at: at };
 }
 
+/* La foto della slide, nelle coordinate dello strato. Se non si può
+   misurare, un riquadro dove di solito sta. */
+function fotoDi(s, base, W, H){
+  var foto = s.querySelector('.image-14');
+  if(foto){
+    var r = foto.getBoundingClientRect();
+    if(r.width && r.height) return { l: r.left - base.left, t: r.top - base.top, r: r.right - base.left, b: r.bottom - base.top };
+  }
+  return { l: W * 0.35, t: H * 0.2, r: W * 0.55, b: H * 0.8 };
+}
+
 var SCENE = [
   {
     nome: 'mattino',
@@ -287,11 +299,16 @@ var SCENE = [
       return [].slice.call(s.querySelectorAll('img, picture, video, svg, h1, h2, h3, h4, h5, h6, p, a, button, .link-uni'))
         .concat([].slice.call(document.querySelectorAll('.cape-hs-palm img, .cape-leaves-top')));
     },
-    gruppi: function(s, W, H, U){
-      var ws = 7.8 * U, wf = 10 * U, hf = 3.2 * U;
+    /* Il sole e tre uccellini sparsi attorno alla foto: lo specchio della
+       slide nera, che ha la luna e tre stelle. */
+    gruppi: function(s, W, H, U, base){
+      var I = fotoDi(s, base, W, H), ws = 7.8 * U, alto = I.b - I.t;
+      function volo(cx, cy, w, dur, at){ return segno('uccello', cx, cy, w, w * 0.5, dur, at); }
       return [
         [segno('sole', W * 0.085, H * 0.22, ws, ws, 0.85, 0)],
-        [segno('freccia', W * 0.95 - wf / 2, H * 0.5, wf, hf, 0.6, 0.3)]
+        [volo(I.r + 3.0 * U, I.t + 2.2 * U,     3.0 * U, 0.26, 0.3)],
+        [volo(I.r + 3.8 * U, I.t + alto * 0.52, 2.0 * U, 0.22, 0.44)],
+        [volo(I.l - 3.2 * U, I.t + alto * 0.74, 2.4 * U, 0.24, 0.58)]
       ];
     }
   },
@@ -309,12 +326,7 @@ var SCENE = [
       return [].slice.call(s.querySelectorAll('img, picture, video, svg, h1, h2, h3, h4, h5, h6, p, a, button, .link-uni'));
     },
     gruppi: function(s, W, H, U, base){
-      var foto = s.querySelector('.image-14'), I = null;
-      if(foto){
-        var r = foto.getBoundingClientRect();
-        if(r.width && r.height) I = { l: r.left - base.left, t: r.top - base.top, r: r.right - base.left, b: r.bottom - base.top };
-      }
-      if(!I) I = { l: W * 0.35, t: H * 0.2, r: W * 0.55, b: H * 0.8 };
+      var I = fotoDi(s, base, W, H);
       return [
         [segno('stella', I.l - 2.4 * U, I.t + 2.6 * U,             2.2 * U, 2.2 * U, 0.3,  0)],
         [segno('stella', I.r + 2.2 * U, I.t + (I.b - I.t) * 0.58,  1.5 * U, 1.5 * U, 0.26, 0.14)],
@@ -648,7 +660,7 @@ function init(){
   scene.forEach(function(sc){ io.observe(sc.s); });
 
   window.capePatti && capePatti.dichiara('matita', {
-    leggo: [['is-on', '.cape-bridge-photo', 'finché il ponte copre la slide bianca, sole e freccia aspettano'],
+    leggo: [['is-on', '.cape-bridge-photo', 'finché il ponte copre la slide bianca, sole e uccellini aspettano'],
             ['is-night', '.cape-hs-track', 'le stelle si disegnano solo sulla slide già nera'],
             ['--cape-veil', '.cape-hs-track', 'se la polvere ha già cominciato a spegnere la slide, le stelle non partono'],
             ['is-via', '.studio-stage .stde-coperta', 'le frecce dello studio partono a montaggio finito']]
