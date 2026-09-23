@@ -90,7 +90,7 @@ var EASE       = 'cubic-bezier(.16,1,.3,1)';
    sposta tutte quelle dopo, e la parola si muove come un blocco. */
 var INVITO_OGNI  = 7;     /* secondi fra un invito e l'altro              */
 var INVITO_PRIMO = 3.5;   /* il primo, dopo che il bottone è salito       */
-var INVITO_EM    = 0.07;  /* di quanto scivola ogni lettera, in em        */
+var INVITO_EM    = 0.11;  /* di quanto scivola ogni lettera, in em        */
 var INVITO_DUR   = 0.9;   /* secondi di una lettera: andata e ritorno     */
 var INVITO_PASSO = 0.07;  /* secondi fra una lettera e la successiva. Molto
                              meno della corsa: le vicine si muovono
