@@ -12,6 +12,7 @@ custom code della pagina, perché là lo spazio è finito.
 | `cape-rotta.js` | la sezione fra studio e cape-open: città e coordinate scritte a schizzo, in due righe che scorrono | ~30 KB |
 | `cape-matita.js` | i segni a matita della home — sole e uccellini sulla slide bianca, luna e stelle sulla nera, frecce nello studio — che si disegnano una volta e se ne vanno | ~28 KB |
 | `cape-surfista.js` | il surfista del footer a matita, già in stop-motion: il video lo scopre mentre cavalca l'onda | ~30 KB |
+| `cape-skew-slow.js` | due effetti a classe: `.skew-img` si scopre col velo inclinato della home, `.slow` sale più lento dello scroll | ~12 KB |
 
 `reel-salita.js` e `cape-open.js` non hanno dipendenze — niente GSAP, niente
 jQuery. `camera-oscura.js` vuole GSAP e ScrollTrigger già caricati.
@@ -485,3 +486,90 @@ serve lo mette il file stesso.
 - **Il lavoro è a pezzi.** Parte quando mancano tre schermate alla sezione, una
   voce per volta nei momenti liberi del browser.
 - **Una sola volta.** Il disegno non si rigioca; il bottone sì.
+
+---
+
+## `cape-skew-slow.js`
+
+Due effetti che si accendono mettendo una classe nel Designer. Nati per la
+pagina minimal, ma non sanno niente di lei. Nessuna dipendenza.
+
+### `.skew-img`
+
+L'elemento resta bianco finché non entra nello schermo per almeno il 15% di
+una schermata (o finché non si vede tutto, se è più piccolo). A quel punto il
+bianco scivola via verso sinistra con la scivolata dell'entrata della sezione
+studio: la curva, la durata (0.9 s) e l'inclinazione (5° al picco di velocità)
+sono quelle del carosello. Una volta sola, e quelli che entrano insieme
+partono insieme. Si aspetta che le immagini abbiano finito di scaricare, ma
+non oltre 2.5 s.
+
+Il bianco non è un foglio appoggiato sopra: è l'elemento stesso che viene
+ritagliato con `clip-path`, e quello che si vede al posto suo è il fondo della
+pagina. Sul bianco è identico al velo della home e non si aggiunge nessun
+elemento. **Su un fondo colorato si vedrebbe quel colore, non il bianco.**
+
+Funziona sull'immagine o su un contenitore: con la classe su un div si scopre
+tutto quello che c'è dentro.
+
+### `.slow`
+
+Sale all'80% della velocità dello scroll. Entra dal basso esattamente dove sta
+nel Designer e poi resta indietro: lo spazio con quello che ha sopra cresce,
+quello con quello che ha sotto cala — lasciagli un po' di margine sotto. Non è
+incollato alla rotella: insegue la sua posizione con `INERZIA`, lo stesso
+inseguimento di `MORBIDEZZA` in `reel-salita.js`.
+
+Si muove con la proprietà `translate` e non con `transform`: le due si sommano,
+quindi un elemento che ha già un suo transform (lo zoom della foto
+dell'header, un Move del Designer, una Interaction) se lo tiene.
+
+Solo da 992px in su. Sotto sta fermo al suo posto.
+
+### Come si include
+
+Nell'**head** della pagina, in fondo a quello che c'è già. Copre le immagini
+prima del primo disegno: senza, quelle già in vista all'apertura si vedrebbero
+un istante prima di diventare bianche. Se il file non arriva entro 5 secondi,
+le scopre da sola e il file, arrivando tardi, le lascia stare.
+
+```html
+<style>
+html.skew-attesa .skew-img{clip-path:polygon(100% 0,100% 0,100% 100%,100% 100%)}
+</style>
+<script>
+(function(){var h=document.documentElement;try{if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;}catch(e){}h.classList.add('skew-attesa');setTimeout(function(){if(h.classList.contains('skew-attesa')){h.classList.remove('skew-attesa');h.classList.add('skew-scaduto');}},5000);})();
+</script>
+```
+
+Nel **footer**, con `defer`:
+
+```html
+<script defer src="https://cdn.jsdelivr.net/gh/cash9086/parallassi-slider@SHA/cape-skew-slow.js"></script>
+```
+
+### Le manopole
+
+| Manopola | Default | Cosa fa |
+|---|---|---|
+| `DURATA` | `0.9` | secondi della scivolata |
+| `SKEW` | `5` | gradi di inclinazione al picco di velocità |
+| `ENTRA` | `0.15` | quanto dev'essere entrato nello schermo, in schermate, prima che parta |
+| `ATTESA` | `2500` | ms massimi di attesa delle immagini |
+| `LENTO` | `0.80` | velocità di salita di `.slow` rispetto allo scroll |
+| `INERZIA` | `0.10` | quanto insegue per fotogramma: 1 è incollato, più basso è più pesante |
+| `MIN_W` | `992` | sotto, `.slow` sta fermo |
+
+### Tre cose che non si deducono leggendo
+
+- **Niente IntersectionObserver per `.skew-img`.** Chrome misura la parte
+  visibile di un elemento *dopo* il suo `clip-path`, e un elemento ritagliato
+  a zero per lui non entra mai nello schermo. La posizione si legge a mano, a
+  ogni scroll, e l'ascolto si stacca quando sono scoperti tutti.
+- **Nel footer appeso non va.** `.footer-end` sta fisso dietro al video: per il
+  codice è già in vista, quindi si scoprirebbe mentre è ancora coperto.
+- **`.slow` dentro un altro `.slow`** si muove due volte: il figlio eredita lo
+  spostamento del padre e ci somma il suo.
+
+`prefers-reduced-motion: reduce` spegne tutti e due: immagini scoperte, niente
+che resta indietro.
