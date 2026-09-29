@@ -13,6 +13,7 @@ custom code della pagina, perché là lo spazio è finito.
 | `cape-matita.js` | i segni a matita della home — sole e uccellini sulla slide bianca, luna e stelle sulla nera, frecce nello studio — che si disegnano una volta e se ne vanno | ~28 KB |
 | `cape-surfista.js` | il surfista del footer a matita, già in stop-motion: il video lo scopre mentre cavalca l'onda | ~30 KB |
 | `cape-skew-slow.js` | due effetti a classe: `.skew-img` si scopre col velo inclinato della home, `.slow` sale più lento dello scroll | ~12 KB |
+| `cape-tendina.js` | effetto a classe: i testi con `.tendina` salgono da dietro il proprio bordo, come nelle slide di `.cape-hs-wrap` | ~12 KB |
 
 `reel-salita.js` e `cape-open.js` non hanno dipendenze — niente GSAP, niente
 jQuery. `camera-oscura.js` vuole GSAP e ScrollTrigger già caricati.
@@ -579,3 +580,71 @@ Nel **footer**, con `defer`:
 
 `prefers-reduced-motion: reduce` spegne tutti e due: immagini scoperte, niente
 che resta indietro.
+
+---
+
+## `cape-tendina.js`
+
+La tendina dei testi delle slide di `.cape-hs-wrap`, su qualunque elemento
+abbia la classe `.tendina`. Stessi numeri della home: un secondo di salita,
+curva `cubic-bezier(.16,1,.3,1)`, 0.15 s fra un testo e l'altro, 0.09 s fra
+una riga e l'altra. Nessuna dipendenza.
+
+Parte quando la cima del testo arriva all'80% dello schermo. Quando il testo
+esce del tutto dallo schermo si rimette sotto il bordo, e rientrando risale:
+a ogni passaggio, come nell'orizzontale.
+
+### Tre modi, scelti da soli
+
+| L'elemento è | Come sale |
+|---|---|
+| solo testo | riga per riga: si misura dove va a capo davvero, e ogni riga ha la sua finestra |
+| testo con dentro altri elementi (un link, un grassetto, un a capo) | tutto il blocco come una riga sola, per non perderli |
+| un link, un bottone, o un contenitore flex o grid | sale di 20px comparendo, senza ritaglio, come i DISCOVER della home |
+
+### Come si include
+
+Nell'**head** della pagina. È lo stesso blocco di `cape-skew-slow.js`, che
+adesso prepara anche i testi: **sostituisce** quello di prima.
+
+```html
+<style>
+html.skew-attesa .skew-img{clip-path:polygon(100% 0,100% 0,100% 100%,100% 100%)}
+html.tendina-attesa .tendina{clip-path:inset(0 0 100% 0)}
+</style>
+<script>
+(function(){var h=document.documentElement;try{if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;}catch(e){}h.classList.add('skew-attesa','tendina-attesa');setTimeout(function(){[['skew-attesa','skew-scaduto'],['tendina-attesa','tendina-scaduto']].forEach(function(c){if(h.classList.contains(c[0])){h.classList.remove(c[0]);h.classList.add(c[1]);}});},5000);})();
+</script>
+```
+
+Nel **footer**, con `defer`:
+
+```html
+<script defer src="https://cdn.jsdelivr.net/gh/cash9086/parallassi-slider@SHA/cape-tendina.js"></script>
+```
+
+### Le manopole
+
+| Manopola | Default | Cosa fa |
+|---|---|---|
+| `DURATA` | `1000` | ms di una salita |
+| `SCALINO` | `150` | ms fra un testo e il successivo |
+| `RIGA` | `90` | ms fra una riga e la successiva dello stesso testo |
+| `PARTENZA` | `0.80` | parte quando la cima arriva a questa altezza dello schermo |
+| `SALITA` | `20` | px di cui sale un bottone |
+| `ATTESA_FONT` | `1200` | ms massimi di attesa del font vero prima di misurare le righe |
+
+### Tre cose che non si deducono leggendo
+
+- **La cascata vale anche fra fotogrammi diversi.** Due testi uno sotto
+  l'altro, scrollando, diventano pronti a pochi fotogrammi di distanza: senza
+  una coda partirebbero quasi insieme. Il file ricorda quando può partire il
+  prossimo, e chi arriva prima aspetta il suo turno.
+- **Le righe si misurano col font vero.** La prima salita aspetta il font, al
+  massimo `ATTESA_FONT`. Se il font arriva dopo, i testi si rimisurano; chi
+  sta salendo si rimisura quando ha finito, per non vederlo scattare.
+- **Fra una riga e l'altra resta uno spazio.** Non si vede, ma senza, chi copia
+  il testo o lo legge con un lettore di schermo troverebbe le parole a cavallo
+  di due righe attaccate.
+
+`prefers-reduced-motion: reduce` spegne tutto: i testi sono al loro posto.
