@@ -556,16 +556,22 @@ Nel **footer**, con `defer`:
 | `SKEW` | `5` | gradi di inclinazione al picco di velocità |
 | `ENTRA` | `0.15` | quanto dev'essere entrato nello schermo, in schermate, prima che parta |
 | `ATTESA` | `2500` | ms massimi di attesa delle immagini |
+| `VICINO` | `1.5` | schermate di distanza a cui le immagini coperte cominciano a scaricarsi |
 | `LENTO` | `0.80` | velocità di salita di `.slow` rispetto allo scroll |
 | `INERZIA` | `0.10` | quanto insegue per fotogramma: 1 è incollato, più basso è più pesante |
 | `MIN_W` | `992` | sotto, `.slow` sta fermo |
 
-### Tre cose che non si deducono leggendo
+### Quattro cose che non si deducono leggendo
 
 - **Niente IntersectionObserver per `.skew-img`.** Chrome misura la parte
   visibile di un elemento *dopo* il suo `clip-path`, e un elemento ritagliato
   a zero per lui non entra mai nello schermo. La posizione si legge a mano, a
   ogni scroll, e l'ascolto si stacca quando sono scoperti tutti.
+- **Le immagini coperte si scaricano da sole.** Webflow le mette in lazy load,
+  e il browser le scarica quando si vedono: ritagliate a zero, per lui non si
+  vedono mai. Senza intervento restavano da scaricare fino alla fine di
+  `ATTESA`, e il bianco partiva a immagine già passata. Quando mancano
+  `VICINO` schermate (1.5) il file le passa a `eager`.
 - **Nel footer appeso non va.** `.footer-end` sta fisso dietro al video: per il
   codice è già in vista, quindi si scoprirebbe mentre è ancora coperto.
 - **`.slow` dentro un altro `.slow`** si muove due volte: il figlio eredita lo

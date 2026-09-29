@@ -54,6 +54,8 @@ var ENTRA    = 0.15;   /* quanto dev'essere entrato nello schermo, in
                           schermate, prima che il bianco parta.              */
 var ATTESA   = 2500;   /* ms: se un'immagine non finisce di caricare entro
                           questo tempo, si scopre lo stesso.                 */
+var VICINO   = 1.5;    /* schermate: a questa distanza dallo schermo le
+                          immagini coperte cominciano a scaricarsi.          */
 
 var LENTO    = 0.80;   /* velocita' di salita di .slow, rispetto allo scroll */
 var INERZIA  = 0.10;   /* quanta strada recupera a ogni fotogramma a 60fps:
@@ -127,9 +129,21 @@ function scoperto(e, v, w, alto){
   return 'polygon(' + a + 'px 0,' + w + 'px 0,' + w + 'px ' + alto + 'px,' + b + 'px ' + alto + 'px)';
 }
 
+function immagini(el){
+  return el.tagName === 'IMG' ? [el] : [].slice.call(el.querySelectorAll('img'));
+}
+
+/* Le immagini di Webflow sono in lazy load, e il browser decide quando
+   scaricarle guardando quanto se ne vede: ritagliate a zero, per lui non si
+   vedono mai. Senza questo restavano da scaricare fino alla fine di ATTESA,
+   e il bianco partiva con l'immagine gia' passata. Qui si dice di scaricarle
+   quando mancano VICINO schermate: arrivate in vista sono pronte. */
+function chiama(el){
+  immagini(el).forEach(function(im){ if(im.loading === 'lazy') im.loading = 'eager'; });
+}
+
 function caricata(el){
-  var imgs = el.tagName === 'IMG' ? [el] : [].slice.call(el.querySelectorAll('img'));
-  return Promise.all(imgs.map(function(im){
+  return Promise.all(immagini(el).map(function(im){
     if(im.complete) return null;
     return new Promise(function(ok){
       im.addEventListener('load', ok, { once: true });
@@ -195,6 +209,7 @@ function avviaSkew(){
     attesa = attesa.filter(function(el){
       var r = el.getBoundingClientRect();
       if(r.right <= 0 || r.left >= vw) return true;
+      if(r.top < vh * (1 + VICINO) && r.bottom > -vh * VICINO) chiama(el);
       var visto = Math.min(r.bottom, vh) - Math.max(r.top, 0);
       if(visto > 0 && visto >= Math.min(ENTRA * vh, r.height - 1)){
         gruppo.push(el);
