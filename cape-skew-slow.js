@@ -23,7 +23,7 @@
 
    .slow
    -----
-   Sale piu' lento dello scroll: al 90%. Entra dal basso esattamente dove sta
+   Sale piu' lento dello scroll: al 95%. Entra dal basso esattamente dove sta
    nel Designer, poi resta indietro, e lo spazio con quello che ha sopra
    cresce. Non e' incollato alla rotella: insegue la sua posizione con un po'
    di ritardo, ed e' quello il peso che si sente.
@@ -57,7 +57,7 @@ var ATTESA   = 2500;   /* ms: se un'immagine non finisce di caricare entro
 var VICINO   = 1.5;    /* schermate: a questa distanza dallo schermo le
                           immagini coperte cominciano a scaricarsi.          */
 
-var LENTO    = 0.90;   /* velocita' di salita di .slow, rispetto allo scroll */
+var LENTO    = 0.95;   /* velocita' di salita di .slow, rispetto allo scroll */
 var INERZIA  = 0.10;   /* quanta strada recupera a ogni fotogramma a 60fps:
                           1 e' incollato alla rotella, piu' basso e' piu'
                           pesante. E' la MORBIDEZZA di reel-salita.js.       */

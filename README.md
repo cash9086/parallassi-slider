@@ -514,7 +514,7 @@ tutto quello che c'è dentro.
 
 ### `.slow`
 
-Sale al 90% della velocità dello scroll. Entra dal basso esattamente dove sta
+Sale al 95% della velocità dello scroll. Entra dal basso esattamente dove sta
 nel Designer e poi resta indietro: lo spazio con quello che ha sopra cresce,
 quello con quello che ha sotto cala — lasciagli un po' di margine sotto. Non è
 incollato alla rotella: insegue la sua posizione con `INERZIA`, lo stesso
@@ -557,7 +557,7 @@ Nel **footer**, con `defer`:
 | `ENTRA` | `0.15` | quanto dev'essere entrato nello schermo, in schermate, prima che parta |
 | `ATTESA` | `2500` | ms massimi di attesa delle immagini |
 | `VICINO` | `1.5` | schermate di distanza a cui le immagini coperte cominciano a scaricarsi |
-| `LENTO` | `0.90` | velocità di salita di `.slow` rispetto allo scroll |
+| `LENTO` | `0.95` | velocità di salita di `.slow` rispetto allo scroll |
 | `INERZIA` | `0.10` | quanto insegue per fotogramma: 1 è incollato, più basso è più pesante |
 | `MIN_W` | `992` | sotto, `.slow` sta fermo |
 
