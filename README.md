@@ -240,6 +240,12 @@ il caso in cui il codice non parta.
 
 ### Note
 
+- **Quando partono le righe.** Di norma quando la cima del titolo arriva al 72%
+  dello schermo. Una pagina con un titolo alto può scrivere su `.cape-open` la
+  variabile `--righe-fondo` (es. `0.9`): allora partono quando il **fondo** del
+  titolo arriva a quella frazione dello schermo, cioè con tutte le righe già
+  dentro. Se il titolo è più alto di così, partono quando la cima arriva al
+  margine opposto. La home non la scrive, e resta com'era.
 - Le righe del titolo si riarmano ogni volta che la sezione esce dallo schermo,
   come fa `.cape-hs-wrap`: risalendo la trovi di nuovo pronta.
 - `prefers-reduced-motion: reduce` spegne binario e srotolamento. Il video resta

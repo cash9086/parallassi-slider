@@ -206,10 +206,38 @@
   }
   var bersaglio = blocco || righe[0].parentNode || righe[0];
   if(bersaglio.getBoundingClientRect().top > window.innerHeight) arma();
-  var giu = Math.round((1 - INIZIO) * 100);
-  new IntersectionObserver(function(es){
-    if(es[0].isIntersecting) gioca();
-  }, { rootMargin:'0px 0px -' + giu + '% 0px' }).observe(bersaglio);
+
+  /* --righe-fondo, se la pagina lo scrive su .cape-open, cambia il momento
+     della partenza: non piu' la cima del titolo a INIZIO, ma il suo FONDO a
+     quella frazione dello schermo, cioe' tutte le righe gia' dentro. Serve
+     quando il titolo e' alto: a 20vh per riga, con la regola della cima,
+     PROUDLY sale ancora sotto il bordo basso e non la vede nessuno. Se il
+     titolo e' piu' alto di quella frazione, e quindi non ci sta mai tutto,
+     parte quando la cima arriva al margine opposto. Senza la variabile resta
+     la regola di sempre: la home non la scrive. */
+  var fondo = parseFloat(getComputedStyle(sec).getPropertyValue('--righe-fondo'));
+  if(fondo > 0 && fondo <= 1){
+    var atteso = false;
+    var guarda = function(){
+      atteso = false;
+      if(giocate) return;
+      var r = bersaglio.getBoundingClientRect(), vh = window.innerHeight || 1;
+      if(r.bottom <= 0 || r.top >= vh) return;
+      if(r.height <= vh * fondo ? r.bottom <= vh * fondo : r.top <= vh * (1 - fondo)) gioca();
+    };
+    window.addEventListener('scroll', function(){
+      if(atteso) return;
+      atteso = true;
+      requestAnimationFrame(guarda);
+    }, { passive:true });
+    window.addEventListener('resize', guarda, { passive:true });
+    guarda();
+  } else {
+    var giu = Math.round((1 - INIZIO) * 100);
+    new IntersectionObserver(function(es){
+      if(es[0].isIntersecting) gioca();
+    }, { rootMargin:'0px 0px -' + giu + '% 0px' }).observe(bersaglio);
+  }
   new IntersectionObserver(function(es){
     if(!es[0].isIntersecting) arma();
   }, { rootMargin:'0px' }).observe(bersaglio);
