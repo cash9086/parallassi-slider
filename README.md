@@ -540,10 +540,10 @@ Solo da 992px in su. Sotto sta fermo al suo posto.
 
 ### `.parallax`
 
-La parallasse dentro la foto. L'immagine è ingrandita del 6% e ritagliata sul
+La parallasse dentro la foto. L'immagine è ingrandita del 12% e ritagliata sul
 suo riquadro; mentre il riquadro attraversa lo schermo lei ci scorre dentro e
 resta indietro: entrando dal basso si vede la parte bassa della foto, uscendo
-in alto quella alta. In tutto scorre del 6% della sua altezza.
+in alto quella alta. In tutto scorre del 12% della sua altezza.
 
 La cornice non si muove e il layout non se ne accorge: il ritaglio è un
 `clip-path` sulla foto stessa, calcolato a ogni scroll perché dopo lo zoom e lo
@@ -566,7 +566,7 @@ tutto da sola, e i file, arrivando tardi, lasciano stare quello che si vede già
 <style>
 html.skew-attesa .skew-img{clip-path:polygon(100% 0,100% 0,100% 100%,100% 100%)}
 html.tendina-attesa .tendina{clip-path:inset(0 0 100% 0)}
-@media (prefers-reduced-motion:no-preference){img.parallax,.parallax img{scale:1.06;clip-path:inset(2.83% 2.83%)}}
+@media (prefers-reduced-motion:no-preference){img.parallax,.parallax img{scale:1.12;clip-path:inset(5.36% 5.36%)}}
 </style>
 <script>
 (function(){var h=document.documentElement;try{if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;}catch(e){}h.classList.add('skew-attesa','tendina-attesa');setTimeout(function(){[['skew-attesa','skew-scaduto'],['tendina-attesa','tendina-scaduto']].forEach(function(c){if(h.classList.contains(c[0])){h.classList.remove(c[0]);h.classList.add(c[1]);}});},5000);})();
@@ -591,7 +591,7 @@ Nel **footer**, con `defer`:
 | `LENTO` | `0.95` | velocità di salita di `.slow` rispetto allo scroll |
 | `INERZIA` | `0.10` | quanto insegue per fotogramma: 1 è incollato, più basso è più pesante |
 | `MIN_W` | `992` | sotto, `.slow` sta fermo |
-| `ZOOM` | `1.06` | ingrandimento di `.parallax`, e quindi la sua corsa. Se lo cambi, cambia anche `1.06` e `2.83%` nell'head: 2.83 è (1 − 1/ZOOM) / 2 × 100 |
+| `ZOOM` | `1.12` | ingrandimento di `.parallax`, e quindi la sua corsa. Se lo cambi, cambia anche `1.12` e `5.36%` nell'head: 5.36 è (1 − 1/ZOOM) / 2 × 100 |
 
 ### Cinque cose che non si deducono leggendo
 

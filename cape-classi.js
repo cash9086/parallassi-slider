@@ -87,11 +87,11 @@ var INERZIA  = 0.10;   /* quanta strada recupera a ogni fotogramma a 60fps:
                           pesante. E' la MORBIDEZZA di reel-salita.js.       */
 var MIN_W    = 992;
 
-var ZOOM     = 1.06;   /* ingrandimento delle foto con .parallax. La corsa
+var ZOOM     = 1.12;   /* ingrandimento delle foto con .parallax. La corsa
                           dentro il riquadro e' tutto il margine che lo zoom
-                          lascia: il 6% dell'altezza della foto. Se lo cambi,
-                          cambia anche il 1.06 e il 2.83% nelle righe
-                          dell'head: 2.83 e' (1 - 1/ZOOM) / 2 * 100.          */
+                          lascia: il 12% dell'altezza della foto. Se lo cambi,
+                          cambia anche il 1.12 e il 5.36% nelle righe
+                          dell'head: 5.36 e' (1 - 1/ZOOM) / 2 * 100.          */
 
 /* ── da qui in giu' non ci sono numeri da girare ──────────────────────── */
 
