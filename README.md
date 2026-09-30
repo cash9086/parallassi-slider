@@ -12,7 +12,7 @@ custom code della pagina, perché là lo spazio è finito.
 | `cape-rotta.js` | la sezione fra studio e cape-open: città e coordinate scritte a schizzo, in due righe che scorrono | ~30 KB |
 | `cape-matita.js` | i segni a matita della home — sole e uccellini sulla slide bianca, luna e stelle sulla nera, frecce nello studio — che si disegnano una volta e se ne vanno | ~28 KB |
 | `cape-surfista.js` | il surfista del footer a matita, già in stop-motion: il video lo scopre mentre cavalca l'onda | ~30 KB |
-| `cape-skew-slow.js` | due effetti a classe: `.skew-img` si scopre col velo inclinato della home, `.slow` sale più lento dello scroll | ~12 KB |
+| `cape-classi.js` | tre effetti a classe: `.skew-img` si scopre col velo inclinato della home, `.slow` sale più lento dello scroll, `.parallax` fa scorrere la foto dentro il suo riquadro | ~20 KB |
 | `cape-tendina.js` | effetto a classe: i testi con `.tendina` salgono da dietro il proprio bordo, come nelle slide di `.cape-hs-wrap` | ~12 KB |
 
 `reel-salita.js` e `cape-open.js` non hanno dipendenze — niente GSAP, niente
@@ -496,10 +496,15 @@ serve lo mette il file stesso.
 
 ---
 
-## `cape-skew-slow.js`
+## `cape-classi.js`
 
-Due effetti che si accendono mettendo una classe nel Designer. Nati per la
+Tre effetti che si accendono mettendo una classe nel Designer. Nati per la
 pagina minimal, ma non sanno niente di lei. Nessuna dipendenza.
+
+Prima si chiamava `cape-skew-slow.js`. È diventato `cape-classi.js` quando è
+arrivato `.parallax`, che deve stare nello stesso file degli altri due per
+mettersi d'accordo con loro sulla stessa foto. Gli SHA vecchi continuano a
+servire il nome vecchio.
 
 ### `.skew-img`
 
@@ -533,26 +538,45 @@ dell'header, un Move del Designer, una Interaction) se lo tiene.
 
 Solo da 992px in su. Sotto sta fermo al suo posto.
 
+### `.parallax`
+
+La parallasse dentro la foto. L'immagine è ingrandita del 6% e ritagliata sul
+suo riquadro; mentre il riquadro attraversa lo schermo lei ci scorre dentro e
+resta indietro: entrando dal basso si vede la parte bassa della foto, uscendo
+in alto quella alta. In tutto scorre del 6% della sua altezza.
+
+La cornice non si muove e il layout non se ne accorge: il ritaglio è un
+`clip-path` sulla foto stessa, calcolato a ogni scroll perché dopo lo zoom e lo
+spostamento combaci esattamente col riquadro di prima. Non serve un
+contenitore con `overflow:hidden`, e la foto non sborda sugli elementi vicini.
+
+Sull'immagine o su un contenitore: con la classe su un div si muovono le foto
+che ci sono dentro, ognuna nel suo riquadro. A qualunque larghezza.
+
 ### Come si include
 
-Nell'**head** della pagina, in fondo a quello che c'è già. Copre le immagini
-prima del primo disegno: senza, quelle già in vista all'apertura si vedrebbero
-un istante prima di diventare bianche. Se il file non arriva entro 5 secondi,
-le scopre da sola e il file, arrivando tardi, le lascia stare.
+Nell'**head** della pagina, un blocco solo per questo file e per
+`cape-tendina.js`. Copre le immagini `skew-img` e i testi `tendina`, e dà alle
+foto `parallax` lo zoom e il ritaglio di partenza, prima del primo disegno:
+senza, quelle già in vista all'apertura si vedrebbero un istante com'erano
+prima di cambiare. Se i file non arrivano entro 5 secondi, la rete scopre
+tutto da sola, e i file, arrivando tardi, lasciano stare quello che si vede già.
 
 ```html
 <style>
 html.skew-attesa .skew-img{clip-path:polygon(100% 0,100% 0,100% 100%,100% 100%)}
+html.tendina-attesa .tendina{clip-path:inset(0 0 100% 0)}
+@media (prefers-reduced-motion:no-preference){img.parallax,.parallax img{scale:1.06;clip-path:inset(2.83% 2.83%)}}
 </style>
 <script>
-(function(){var h=document.documentElement;try{if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;}catch(e){}h.classList.add('skew-attesa');setTimeout(function(){if(h.classList.contains('skew-attesa')){h.classList.remove('skew-attesa');h.classList.add('skew-scaduto');}},5000);})();
+(function(){var h=document.documentElement;try{if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;}catch(e){}h.classList.add('skew-attesa','tendina-attesa');setTimeout(function(){[['skew-attesa','skew-scaduto'],['tendina-attesa','tendina-scaduto']].forEach(function(c){if(h.classList.contains(c[0])){h.classList.remove(c[0]);h.classList.add(c[1]);}});},5000);})();
 </script>
 ```
 
 Nel **footer**, con `defer`:
 
 ```html
-<script defer src="https://cdn.jsdelivr.net/gh/cash9086/parallassi-slider@SHA/cape-skew-slow.js"></script>
+<script defer src="https://cdn.jsdelivr.net/gh/cash9086/parallassi-slider@SHA/cape-classi.js"></script>
 ```
 
 ### Le manopole
@@ -567,9 +591,15 @@ Nel **footer**, con `defer`:
 | `LENTO` | `0.95` | velocità di salita di `.slow` rispetto allo scroll |
 | `INERZIA` | `0.10` | quanto insegue per fotogramma: 1 è incollato, più basso è più pesante |
 | `MIN_W` | `992` | sotto, `.slow` sta fermo |
+| `ZOOM` | `1.06` | ingrandimento di `.parallax`, e quindi la sua corsa. Se lo cambi, cambia anche `1.06` e `2.83%` nell'head: 2.83 è (1 − 1/ZOOM) / 2 × 100 |
 
-### Quattro cose che non si deducono leggendo
+### Cinque cose che non si deducono leggendo
 
+- **Sulla stessa foto stanno anche tutti e tre.** `slow` e `parallax` scrivono
+  tutti e due `translate`: si sommano, e ognuno, quando misura, toglie solo la
+  sua parte. Mentre il bianco di `skew-img` scivola il `clip-path` è suo, ma la
+  parte scoperta si ritaglia sul riquadro di `parallax`, e a scivolata finita
+  il ritaglio torna a `parallax`.
 - **Niente IntersectionObserver per `.skew-img`.** Chrome misura la parte
   visibile di un elemento *dopo* il suo `clip-path`, e un elemento ritagliato
   a zero per lui non entra mai nello schermo. La posizione si legge a mano, a
@@ -584,8 +614,8 @@ Nel **footer**, con `defer`:
 - **`.slow` dentro un altro `.slow`** si muove due volte: il figlio eredita lo
   spostamento del padre e ci somma il suo.
 
-`prefers-reduced-motion: reduce` spegne tutti e due: immagini scoperte, niente
-che resta indietro.
+`prefers-reduced-motion: reduce` spegne tutto: immagini scoperte, senza zoom,
+niente che resta indietro.
 
 ---
 
@@ -610,18 +640,8 @@ a ogni passaggio, come nell'orizzontale.
 
 ### Come si include
 
-Nell'**head** della pagina. È lo stesso blocco di `cape-skew-slow.js`, che
-adesso prepara anche i testi: **sostituisce** quello di prima.
-
-```html
-<style>
-html.skew-attesa .skew-img{clip-path:polygon(100% 0,100% 0,100% 100%,100% 100%)}
-html.tendina-attesa .tendina{clip-path:inset(0 0 100% 0)}
-</style>
-<script>
-(function(){var h=document.documentElement;try{if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;}catch(e){}h.classList.add('skew-attesa','tendina-attesa');setTimeout(function(){[['skew-attesa','skew-scaduto'],['tendina-attesa','tendina-scaduto']].forEach(function(c){if(h.classList.contains(c[0])){h.classList.remove(c[0]);h.classList.add(c[1]);}});},5000);})();
-</script>
-```
+Nell'**head** della pagina: è il blocco unico descritto nella sezione di
+`cape-classi.js`, che prepara anche i testi.
 
 Nel **footer**, con `defer`:
 
