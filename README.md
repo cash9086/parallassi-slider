@@ -11,7 +11,7 @@ custom code della pagina, perché là lo spazio è finito.
 | `cape-studio-entrata.js` | la sezione studio: bianca, poi tutto insieme, una volta sola | ~15 KB |
 | `cape-rotta.js` | la sezione fra studio e cape-open: città e coordinate scritte a schizzo, in due righe che scorrono | ~30 KB |
 | `cape-matita.js` | i segni a matita della home — sole e uccellini sulla slide bianca, luna e stelle sulla nera, frecce nello studio — che si disegnano una volta e se ne vanno | ~28 KB |
-| `cape-surfista.js` | il surfista del footer a matita, già in stop-motion: il video lo scopre mentre cavalca l'onda | ~30 KB |
+| `cape-surfista.js` | il surfista del footer a matita, già in stop-motion: il video lo scopre mentre cavalca l'onda. Sulle altre pagine va su un'immagine con `.surfista` | ~30 KB |
 | `cape-classi.js` | tre effetti a classe: `.skew-img` si scopre col velo inclinato della home, `.slow` sale più lento dello scroll, `.parallax` fa scorrere la foto dentro il suo riquadro | ~20 KB |
 | `cape-tendina.js` | effetto a classe: i testi con `.tendina` salgono da dietro il proprio bordo, come nelle slide di `.cape-hs-wrap` | ~12 KB |
 
@@ -674,3 +674,34 @@ Nel **footer**, con `defer`:
   di due righe attaccate.
 
 `prefers-reduced-motion: reduce` spegne tutto: i testi sono al loro posto.
+
+## `cape-surfista.js`
+
+Il surfista del footer della home, a matita e in stop-motion: circa otto
+fotogrammi al secondo, le linee che "bollono", il surfista che sale e scende
+sull'onda. Gira solo quando il bordo basso del video ne ha scoperto un pezzo,
+e si ferma da solo quando non si vede.
+
+### Dove si disegna
+
+Al posto di un'immagine, nel suo riquadro. L'immagine resta nel documento,
+trasparente, e dà posto e misura; quello che c'è dentro non conta.
+
+| Pagina | Immagine |
+|---|---|
+| Home | `.cape-fondo .cape-fondo-marchio` |
+| Le altre | quella con la classe `.surfista`, o quella dentro un contenitore `.surfista` |
+
+Il surfista è uno per pagina: se ce ne sono due, vince il primo.
+
+### Come si include
+
+Nel **footer**, con `defer`:
+
+```html
+<script defer src="https://cdn.jsdelivr.net/gh/cash9086/parallassi-slider@SHA/cape-surfista.js"></script>
+```
+
+Sotto i 992px e con `prefers-reduced-motion: reduce` non si disegna niente:
+resta l'immagine com'è.
+

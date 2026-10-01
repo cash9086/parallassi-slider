@@ -24,6 +24,12 @@
    NIENTE DIPENDENZE. Niente sotto i 992px e niente per chi chiede meno
    movimento: lì resta l'immagine com'è.
 
+   SULLE ALTRE PAGINE: la classe surfista su un'immagine (o sul suo
+   contenitore). L'immagine diventa trasparente e il surfista si disegna nel
+   suo riquadro, al suo posto, qualunque cosa ci fosse dentro: è lei a dare
+   misura e posto, non il suo contenuto. Il surfista è uno per pagina: se ce
+   ne sono due, vince il primo.
+
    VA IN PAGINA: un tag <script defer> nel footer, in PARTE 2.
 */
 (function(){
@@ -49,7 +55,7 @@ var MIN_W      = 992;
 
 /* ── da qui in giù non ci sono numeri da girare ──────────────────────── */
 
-var IMG   = '.cape-fondo .cape-fondo-marchio';
+var IMG   = '.cape-fondo .cape-fondo-marchio, img.surfista, .surfista img';
 var LATO  = 1296;
 var INK   = '#141416';
 var PERNO = [600, 520];   /* dove il surfista poggia sulla tavola */
@@ -195,7 +201,7 @@ function vesti(){
   var st = document.createElement('style');
   st.id = 'cape-surfista-css';
   st.textContent =
-    '.cape-fondo-marchio.is-matita{opacity:0}' +
+    '.cape-fondo-marchio.is-matita,img.surfista.is-matita,.surfista img.is-matita{opacity:0}' +
     '.cape-surfista{position:absolute;overflow:visible;pointer-events:none;z-index:1}' +
     '.cape-surfista .cs-strato{display:none}' +
     '.cape-surfista .cs-strato.is-su{display:inline}';
